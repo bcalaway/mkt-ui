@@ -23,3 +23,10 @@ export function bpChange(aPercent: string, bPercent: string): string {
   if (body === "0") return "0";
   return `${neg ? "-" : "+"}${body}`;
 }
+
+/** Compare two decimal strings exactly: negative, zero or positive, like a sort comparator. */
+export function compareDecimal(a: string, b: string): number {
+  const places = 8;
+  const d = scaled(a, places) - scaled(b, places);
+  return d < 0n ? -1 : d > 0n ? 1 : 0;
+}
