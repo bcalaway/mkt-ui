@@ -14,7 +14,9 @@ import {
   type MouseEventParams,
   type Time,
 } from "lightweight-charts";
+import ChartToolbar from "./ChartToolbar";
 import { useChartTheme } from "./theme";
+import { zoomAboutMiddle } from "./zoom";
 
 export interface TimePoint {
   date: string; // YYYY-MM-DD: the day, or a bar's first calendar day
@@ -56,6 +58,7 @@ export default function TimeSeriesChart({
 }) {
   const theme = useChartTheme();
   const box = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
   const [hover, setHover] = useState<Hover | null>(null);
 
   useEffect(() => {
@@ -76,6 +79,7 @@ export default function TimeSeriesChart({
       crosshair: { mode: CrosshairMode.Magnet },
       localization: { priceFormatter: (v: number) => `${v.toFixed(unit === "bp" ? 0 : 2)}${unit === "bp" ? "" : "%"}` },
     });
+    chartRef.current = chart;
     const byLine: { line: TimeLine; byDate: Map<string, TimePoint> }[] = lines.map((line) => {
       const color = theme.series[line.slot % theme.series.length];
       if (bars) {
@@ -117,6 +121,7 @@ export default function TimeSeriesChart({
     chart.subscribeCrosshairMove(onMove);
     return () => {
       chart.unsubscribeCrosshairMove(onMove);
+      chartRef.current = null;
       chart.remove();
     };
   }, [lines, unit, bars, height, theme]);
@@ -124,6 +129,11 @@ export default function TimeSeriesChart({
   return (
     <div className="chart" style={{ position: "relative" }}>
       <div ref={box} style={{ height }} />
+      <ChartToolbar
+        onZoomIn={() => zoomAboutMiddle(chartRef.current, 0.5)}
+        onZoomOut={() => zoomAboutMiddle(chartRef.current, 2)}
+        onReset={() => chartRef.current?.timeScale().fitContent()}
+      />
       {hover && (
         <div className="tooltip" style={{ left: Math.max(8, hover.x + 16) }} role="status">
           <div className="tooltip-date">{hover.date}</div>

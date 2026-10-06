@@ -23,6 +23,8 @@ import {
   type Time,
 } from "lightweight-charts";
 import { addDays, daysBetween, pickInterval, type Interval } from "./bars";
+import ChartToolbar, { type Preset } from "./ChartToolbar";
+import { zoomAboutMiddle } from "./zoom";
 import { useChartTheme } from "./theme";
 import type { TimeLine } from "./TimeSeriesChart";
 
@@ -56,6 +58,7 @@ export default function ZoomChart({
   bars = false,
   height = 380,
   onInterval,
+  presets = [],
 }: {
   loader: Loader;
   first: string; // the earliest date there could be data for
@@ -64,9 +67,13 @@ export default function ZoomChart({
   bars?: boolean;
   height?: number;
   onInterval?: (interval: Interval) => void;
+  presets?: Preset[];
 }) {
   const theme = useChartTheme();
   const box = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  // Set by the chart's effect: back to all of history, or the last n days.
+  const actions = useRef<{ reset: () => void; showLast: (days: number) => void }>({ reset: () => {}, showLast: () => {} });
   const [hover, setHover] = useState<Hover | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -88,6 +95,7 @@ export default function ZoomChart({
       localization: { priceFormatter: (v: number) => `${v.toFixed(unit === "bp" ? 0 : 2)}${unit === "bp" ? "" : "%"}` },
     });
 
+    chartRef.current = chart;
     let series: ISeriesApi<SeriesType>[] = [];
     let shown: { lines: TimeLine[]; byDate: Map<string, Map<string, TimeLine["points"][number]>>; axis: string[] } = {
       lines: [],
@@ -182,13 +190,23 @@ export default function ZoomChart({
     };
     chart.subscribeCrosshairMove(onMove);
 
-    void load(pickInterval(daysBetween(first, today)), first, today, null);
+    const reset = () => void load(pickInterval(daysBetween(first, today)), first, today, null);
+    actions.current = {
+      reset,
+      // Show the last n days on whatever is loaded; the zoom handler then loads finer bars for it.
+      showLast: (days: number) => {
+        const from = addDays(today, -days) < first ? first : addDays(today, -days);
+        chart.timeScale().setVisibleRange({ from: from as Time, to: today as Time });
+      },
+    };
+    reset();
 
     return () => {
       alive = false;
       clearTimeout(timer);
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRange);
       chart.unsubscribeCrosshairMove(onMove);
+      chartRef.current = null;
       chart.remove();
     };
   }, [loader, first, today, unit, bars, height, theme, onInterval]);
@@ -196,6 +214,13 @@ export default function ZoomChart({
   return (
     <div className="chart" style={{ position: "relative" }}>
       <div ref={box} style={{ height }} />
+      <ChartToolbar
+        onZoomIn={() => zoomAboutMiddle(chartRef.current, 0.5)}
+        onZoomOut={() => zoomAboutMiddle(chartRef.current, 2)}
+        onReset={() => actions.current.reset()}
+        presets={presets}
+        onPreset={(p) => actions.current.showLast(p.days)}
+      />
       {error && <p className="error chart-error">Couldn't load: {error}</p>}
       {hover && (
         <div className="tooltip" style={{ left: Math.max(8, hover.x + 16) }} role="status">
