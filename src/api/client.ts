@@ -20,6 +20,7 @@ export type SeriesResponse = Schemas["SeriesResponse"];
 export type SpreadResponse = Schemas["SpreadResponse"];
 export type BarsResponse = Schemas["BarsResponse"];
 export type BarSeries = Schemas["BarSeriesOut"];
+export type ChartEventOut = Schemas["EventOut"];
 
 export class ApiError extends Error {
   constructor(

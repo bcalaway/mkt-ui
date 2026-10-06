@@ -15,3 +15,11 @@ export interface TimeLine {
   slot: number; // categorical color slot: fixed per line, not by position
   points: TimePoint[];
 }
+
+/** Something to mark on a time chart (from mkt-api's /api/events). */
+export interface ChartEvent {
+  date: string;
+  title: string; // the marker's label: "Gap", "Method change"
+  text: string;
+  lines: string[]; // the keys of the lines it's about, marked on the first one shown; [] for the first line
+}
