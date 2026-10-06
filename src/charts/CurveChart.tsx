@@ -28,18 +28,29 @@ export default function CurveChart({ tenors, lines, height = 380 }: { tenors: st
   const theme = useChartTheme();
   const box = useRef<HTMLDivElement>(null);
   const chartRef = useRef<echarts.ECharts | null>(null);
+  // The tenors on screen when the chart was last torn down, so adding or
+  // removing a curve keeps the zoom.
+  const view = useRef<{ from: string; to: string } | null>(null);
 
   useEffect(() => {
     if (!box.current) return;
     const chart = echarts.init(box.current, undefined, { renderer: "svg" });
     chartRef.current = chart;
     const color = (slot: number) => theme.series[slot % theme.series.length];
+    const kept = view.current && tenors.includes(view.current.from) && tenors.includes(view.current.to) ? view.current : null;
     chart.setOption({
       backgroundColor: theme.surface,
       textStyle: { fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif', color: theme.inkSecondary },
       grid: { left: 56, right: 120, top: 48, bottom: 40 },
-      // Wheel and pinch zoom the tenors; the toolbar does the same with buttons.
-      dataZoom: [{ type: "inside", xAxisIndex: 0, filterMode: "none" }],
+      // Wheel and pinch zoom the tenors; All shows them all again.
+      dataZoom: [
+        {
+          type: "inside",
+          xAxisIndex: 0,
+          filterMode: "none",
+          ...(kept ? { startValue: tenors.indexOf(kept.from), endValue: tenors.indexOf(kept.to) } : {}),
+        },
+      ],
       legend: { top: 8, left: 56, textStyle: { color: theme.inkSecondary }, icon: "roundRect", itemWidth: 14, itemHeight: 4 },
       tooltip: {
         trigger: "axis",
@@ -93,6 +104,12 @@ export default function CurveChart({ tenors, lines, height = 380 }: { tenors: st
     const resize = () => chart.resize();
     window.addEventListener("resize", resize);
     return () => {
+      const zoom = (chart.getOption().dataZoom as { startValue?: number; endValue?: number }[] | undefined)?.[0];
+      if (zoom && zoom.startValue != null && zoom.endValue != null) {
+        const from = tenors[Math.round(zoom.startValue)];
+        const to = tenors[Math.round(zoom.endValue)];
+        view.current = from && to ? { from, to } : null;
+      }
       window.removeEventListener("resize", resize);
       chartRef.current = null;
       chart.dispose();

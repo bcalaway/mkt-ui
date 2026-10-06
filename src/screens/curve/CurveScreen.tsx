@@ -8,7 +8,7 @@ import { useQueryUpdater, type Location } from "../../router";
 import type { Screen } from "../types";
 
 const COMPARE_CHOICES = ["1W", "1M", "3M", "1Y"];
-const DEFAULT_COMPARE = ["1W", "1M", "1Y"];
+const DEFAULT_COMPARE = ["1W", "1M", "3M", "1Y"];
 
 function curveName(c: Curve): string {
   return c.label === "latest" || c.label === "date" ? "Selected" : `${c.label} earlier`;

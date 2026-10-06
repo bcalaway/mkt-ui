@@ -1,7 +1,8 @@
 // A time chart that opens on all of history and gets finer as you zoom
 // (TradingView Lightweight Charts). It asks its `loader` for bars at the
 // interval that suits what's on screen (months, weeks, days) and keeps the
-// same window in view when the data changes under it. Where the bars come
+// same window in view when the data changes under it, including when the
+// lines change (a tenor added or removed, lines to bars, another source). Where the bars come
 // from is the loader's business (src/charts/loaders.ts: asking mkt-api for
 // each zoom level, or loading every day once and summing up in the browser).
 //
@@ -74,6 +75,9 @@ export default function ZoomChart({
   const box = useRef<HTMLDivElement>(null);
   // Set by the chart's effect: All (every bar since the first date), or the last n days.
   const actions = useRef<{ reset: () => void; showLast: (days: number) => void }>({ reset: () => {}, showLast: () => {} });
+  // The dates on screen when the chart was last torn down, so a new loader
+  // (or bars, or a theme) opens where the last one was rather than on initialDays.
+  const view = useRef<{ from: string; to: string } | null>(null);
   const [hover, setHover] = useState<Hover | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -154,23 +158,34 @@ export default function ZoomChart({
       return axis[Math.floor(index)];
     };
 
-    // On a zoom or pan: once it settles, the interval that suits the window,
-    // loaded for the window and as much again either side (room to pan).
+    const clamp = (d: string) => (d < first ? first : d > today ? today : d);
+    // The dates on screen, or null before the first load has drawn anything.
+    const onScreen = (): { from: string; to: string } | null => {
+      const logical: LogicalRange | null = chart.timeScale().getVisibleLogicalRange();
+      if (!logical || !current) return null;
+      return { from: clamp(dateAt(logical.from)), to: clamp(dateAt(logical.to)) };
+    };
+    // A window's bars at the interval that suits it, loaded for the window and
+    // as much again either side (room to pan).
+    const showRange = (from: string, to: string) => {
+      const span = Math.max(1, daysBetween(from, to));
+      const want = pickInterval(span);
+      const keep: IRange<Time> = { from: from as Time, to: to as Time };
+      if (want === "month") void load(want, first, today, keep);
+      else void load(want, clamp(addDays(from, -span)), clamp(addDays(to, span)), keep);
+    };
+
+    // On a zoom or pan: once it settles, reload if the window wants another
+    // interval or has run past what's loaded.
     const onRange = () => {
       clearTimeout(timer);
       timer = setTimeout(() => {
-        const logical: LogicalRange | null = chart.timeScale().getVisibleLogicalRange();
-        if (!logical || !current) return;
-        const clamp = (d: string) => (d < first ? first : d > today ? today : d);
-        const from = clamp(dateAt(logical.from));
-        const to = clamp(dateAt(logical.to));
-        const span = Math.max(1, daysBetween(from, to));
-        const want = pickInterval(span);
-        const covered = (current.from <= from || current.from <= first) && (current.to >= to || current.to >= today);
+        const win = onScreen();
+        if (!win || !current) return;
+        const want = pickInterval(Math.max(1, daysBetween(win.from, win.to)));
+        const covered = (current.from <= win.from || current.from <= first) && (current.to >= win.to || current.to >= today);
         if (want === current.interval && covered) return;
-        const keep: IRange<Time> = { from: from as Time, to: to as Time };
-        if (want === "month") void load(want, first, today, keep);
-        else void load(want, clamp(addDays(from, -span)), clamp(addDays(to, span)), keep);
+        showRange(win.from, win.to);
       }, DEBOUNCE_MS);
     };
     chart.timeScale().subscribeVisibleLogicalRangeChange(onRange);
@@ -199,10 +214,12 @@ export default function ZoomChart({
       else void load(want, addDays(from, -days) < first ? first : addDays(from, -days), today, keep);
     };
     actions.current = { reset, showLast };
-    if (initialDays) showLast(initialDays);
+    if (view.current) showRange(view.current.from, view.current.to);
+    else if (initialDays) showLast(initialDays);
     else reset();
 
     return () => {
+      view.current = onScreen() ?? view.current;
       alive = false;
       clearTimeout(timer);
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRange);
