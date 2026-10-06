@@ -3,7 +3,6 @@ import { pathToFileURL } from "node:url";
 import express from "express";
 import { auth } from "express-openid-connect";
 import { config } from "./config.js";
-import { checkConnection } from "./db.js";
 
 const DIST_DIR = path.join(import.meta.dirname, "..", "dist");
 
@@ -69,8 +68,24 @@ export function createApp() {
     app.get("/login", (req, res) => res.status(501).json({ error: "auth not configured" }));
   }
 
-  app.get("/db-check", async (req, res) => {
-    res.json({ connected: await checkConnection() });
+  // The market data API: mkt-api (internal, mkt-api:8000) for the signed-in
+  // user. Reads only, so GET only; the answer (or mkt-api's error) passes
+  // through as it is. Gated by the login check above like every other route.
+  app.get("/api/{*path}", async (req, res) => {
+    // Only the path and query come from the request; the host is always
+    // mkt-api's, so a crafted path can't send this request anywhere else.
+    const url = new URL(config.mktApiUrl);
+    url.pathname = req.path;
+    url.search = new URL(req.originalUrl, "http://x").search;
+    try {
+      const upstream = await fetch(url, {
+        headers: { accept: "application/json" },
+        signal: AbortSignal.timeout(config.mktApiTimeoutMs),
+      });
+      res.status(upstream.status).type("application/json").send(await upstream.text());
+    } catch (err) {
+      res.status(502).json({ detail: `mkt-api didn't answer: ${err.message}` });
+    }
   });
 
   app.use(express.static(DIST_DIR));

@@ -1,0 +1,92 @@
+// The yield curve on one or more dates (ECharts): tenors along the bottom in
+// curve order, yields up the side, one line per date. The tooltip and the end
+// labels show the API's strings; floats are only for drawing.
+import { useEffect, useRef } from "react";
+import * as echarts from "echarts/core";
+import { LineChart } from "echarts/charts";
+import { GridComponent, LegendComponent, TooltipComponent } from "echarts/components";
+import { SVGRenderer } from "echarts/renderers";
+import { useChartTheme } from "./theme";
+
+echarts.use([LineChart, GridComponent, LegendComponent, TooltipComponent, SVGRenderer]);
+
+export interface CurveLine {
+  key: string;
+  label: string; // the legend and tooltip: "Latest · 2026-10-02"
+  short: string; // the end label: "Latest", "1W"
+  slot: number;
+  values: Record<string, { text: string; source: string } | undefined>; // by tenor label
+}
+
+export default function CurveChart({ tenors, lines, height = 380 }: { tenors: string[]; lines: CurveLine[]; height?: number }) {
+  const theme = useChartTheme();
+  const box = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!box.current) return;
+    const chart = echarts.init(box.current, undefined, { renderer: "svg" });
+    const color = (slot: number) => theme.series[slot % theme.series.length];
+    chart.setOption({
+      backgroundColor: theme.surface,
+      textStyle: { fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif', color: theme.inkSecondary },
+      grid: { left: 56, right: 120, top: 48, bottom: 40 },
+      legend: { top: 8, left: 56, textStyle: { color: theme.inkSecondary }, icon: "roundRect", itemWidth: 14, itemHeight: 4 },
+      tooltip: {
+        trigger: "axis",
+        backgroundColor: theme.surface,
+        borderColor: theme.axis,
+        textStyle: { color: theme.ink },
+        axisPointer: { type: "line", lineStyle: { color: theme.axis } },
+        formatter: (params: unknown) => {
+          const list = params as { axisValue: string; seriesIndex: number }[];
+          if (!list.length) return "";
+          const tenor = list[0].axisValue;
+          const rows = lines
+            .map((l) => ({ l, v: l.values[tenor] }))
+            .filter((r) => r.v)
+            .map(
+              ({ l, v }) =>
+                `<div style="display:flex;gap:8px;align-items:center"><span style="width:10px;height:3px;border-radius:2px;background:${color(l.slot)}"></span>` +
+                `<span>${l.label}</span><b style="margin-left:auto;font-variant-numeric:tabular-nums">${v!.text}%</b></div>`,
+            )
+            .join("");
+          return `<div style="font-weight:600;margin-bottom:4px">${tenor}</div>${rows}`;
+        },
+      },
+      xAxis: {
+        type: "category",
+        data: tenors,
+        boundaryGap: false,
+        axisLine: { lineStyle: { color: theme.axis } },
+        axisTick: { show: false },
+        axisLabel: { color: theme.muted },
+      },
+      yAxis: {
+        type: "value",
+        scale: true,
+        axisLabel: { color: theme.muted, formatter: (v: number) => `${v.toFixed(2)}%` },
+        splitLine: { lineStyle: { color: theme.grid } },
+      },
+      series: lines.map((l) => ({
+        name: l.label,
+        type: "line",
+        data: tenors.map((t) => (l.values[t] ? Number(l.values[t]!.text) : null)),
+        connectNulls: false,
+        symbol: "circle",
+        symbolSize: 8,
+        lineStyle: { width: 2, color: color(l.slot) },
+        itemStyle: { color: color(l.slot), borderColor: theme.surface, borderWidth: 2 },
+        endLabel: { show: true, formatter: l.short, color: theme.inkSecondary },
+        emphasis: { focus: "series" },
+      })),
+    });
+    const resize = () => chart.resize();
+    window.addEventListener("resize", resize);
+    return () => {
+      window.removeEventListener("resize", resize);
+      chart.dispose();
+    };
+  }, [tenors, lines, theme]);
+
+  return <div ref={box} className="chart" style={{ height }} />;
+}

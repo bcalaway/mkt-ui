@@ -6,7 +6,9 @@ export default [
   { ignores: ["dist/**", "node_modules/**"] },
   js.configs.recommended,
   {
-    files: ["src/**/*.{js,jsx}", "tests/App.test.jsx"],
+    // The frontend is TypeScript (type-checked by `tsc --noEmit` in `npm run
+    // lint`); this block covers any plain JS left in src/.
+    files: ["src/**/*.{js,jsx}"],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "module",

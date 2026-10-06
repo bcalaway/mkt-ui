@@ -17,4 +17,4 @@ The market data platform's UI at `mkt.billandjessie.com`. The overview is in `RE
 
 ## Testing where npm is blocked
 
-Claude's sandbox usually can't reach the npm registry, so `npm ci` fails there. CI runs lint, build and tests (`docker build --target lint` / `--target test`). CI's logs aren't readable from the sandbox; read a failure from the check run's annotations (`gh api repos/bcalaway/mkt-ui/check-runs/<id>/annotations`).
+Claude's sandbox usually can't reach the npm registry, so `npm ci` fails there. To add or change a dependency, edit `package.json` only and push: the Lockfile workflow commits the matching `package-lock.json` to the PR branch (then pull and push again: the bot commit's own CI run waits for approval). CI runs lint (ESLint and `tsc`), build and tests (`docker build --target lint` / `--target test`). CI's logs aren't readable from the sandbox; read a failure from the check run's annotations (`gh api repos/bcalaway/mkt-ui/check-runs/<id>/annotations`).
