@@ -24,7 +24,6 @@ import {
 } from "lightweight-charts";
 import { addDays, daysBetween, pickInterval, type Interval } from "./bars";
 import ChartToolbar, { type Preset } from "./ChartToolbar";
-import { zoomAboutMiddle } from "./zoom";
 import { useChartTheme } from "./theme";
 import type { TimeLine } from "./types";
 
@@ -73,8 +72,7 @@ export default function ZoomChart({
 }) {
   const theme = useChartTheme();
   const box = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<IChartApi | null>(null);
-  // Set by the chart's effect: back to all of history, or the last n days.
+  // Set by the chart's effect: All (every bar since the first date), or the last n days.
   const actions = useRef<{ reset: () => void; showLast: (days: number) => void }>({ reset: () => {}, showLast: () => {} });
   const [hover, setHover] = useState<Hover | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -97,7 +95,6 @@ export default function ZoomChart({
       localization: { priceFormatter: (v: number) => `${v.toFixed(unit === "bp" ? 0 : 2)}${unit === "bp" ? "" : "%"}` },
     });
 
-    chartRef.current = chart;
     let series: ISeriesApi<SeriesType>[] = [];
     let shown: { lines: TimeLine[]; byDate: Map<string, Map<string, TimeLine["points"][number]>>; axis: string[] } = {
       lines: [],
@@ -210,7 +207,6 @@ export default function ZoomChart({
       clearTimeout(timer);
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRange);
       chart.unsubscribeCrosshairMove(onMove);
-      chartRef.current = null;
       chart.remove();
     };
   }, [loader, first, today, unit, bars, height, theme, onInterval, initialDays]);
@@ -218,13 +214,7 @@ export default function ZoomChart({
   return (
     <div className="chart" style={{ position: "relative" }}>
       <div ref={box} style={{ height }} />
-      <ChartToolbar
-        onZoomIn={() => zoomAboutMiddle(chartRef.current, 0.5)}
-        onZoomOut={() => zoomAboutMiddle(chartRef.current, 2)}
-        onReset={() => actions.current.reset()}
-        presets={presets}
-        onPreset={(p) => actions.current.showLast(p.days)}
-      />
+      <ChartToolbar onAll={() => actions.current.reset()} presets={presets} onPreset={(p) => actions.current.showLast(p.days)} />
       {error && <p className="error chart-error">Couldn't load: {error}</p>}
       {hover && (
         <div className="tooltip" style={{ left: Math.max(8, hover.x + 16) }} role="status">

@@ -1,39 +1,31 @@
-// The controls every chart has, in the same place: zoom in, zoom out and
-// reset, plus optional jumps to a span ("10Y", "2Y", "3M"). Each chart
-// component wires them to its library; screens don't.
+// The controls every chart has, in the same place: jumps to a span ("1Y",
+// "10Y") where a chart offers them, and All, which shows everything. Zooming
+// in between is the scroll wheel, a pinch or a drag (Bill, 2026-10-06: All
+// rather than Reset; no + / − buttons). Each chart component wires these to
+// its library; screens don't.
 export interface Preset {
   label: string;
   days: number;
 }
 
 export default function ChartToolbar({
-  onZoomIn,
-  onZoomOut,
-  onReset,
+  onAll,
   presets = [],
   onPreset,
 }: {
-  onZoomIn: () => void;
-  onZoomOut: () => void;
-  onReset: () => void;
+  onAll: () => void;
   presets?: Preset[];
   onPreset?: (p: Preset) => void;
 }) {
   return (
-    <div className="chart-toolbar" role="toolbar" aria-label="Chart zoom">
+    <div className="chart-toolbar" role="toolbar" aria-label="Chart span">
       {presets.map((p) => (
         <button key={p.label} type="button" className="tool" onClick={() => onPreset?.(p)} title={`Show the last ${p.label}`}>
           {p.label}
         </button>
       ))}
-      <button type="button" className="tool" onClick={onZoomIn} aria-label="Zoom in" title="Zoom in">
-        +
-      </button>
-      <button type="button" className="tool" onClick={onZoomOut} aria-label="Zoom out" title="Zoom out">
-        −
-      </button>
-      <button type="button" className="tool" onClick={onReset} title="Show everything">
-        Reset
+      <button type="button" className="tool" onClick={onAll} title="Show everything">
+        All
       </button>
     </div>
   );
