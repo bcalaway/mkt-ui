@@ -25,7 +25,7 @@ const SPREADS: { key: string; long: string; short: string; label: string }[] = [
   { key: "2s10s", long: "UST-10Y-CMT", short: "UST-2Y-CMT", label: "10-year minus 2-year" },
   { key: "3m10y", long: "UST-10Y-CMT", short: "UST-3M-CMT", label: "10-year minus 3-month" },
 ];
-const DEFAULT_NAMES = ["UST-2Y-CMT", "UST-10Y-CMT"];
+const DEFAULT_NAMES = ["UST-2Y-CMT", "UST-10Y-CMT", "UST-30Y-CMT"];
 
 interface LatestRow {
   name: string;
@@ -108,7 +108,7 @@ function SeriesPage({ location }: { location: Location }) {
       <header className="screen-head">
         <h1>Yields over time</h1>
         <p className="lede">
-          Constant-maturity yields since 1962. Zoom with the buttons, the scroll wheel or a pinch: months for decades, weeks for
+          Constant-maturity yields since 1962. Jump to a span with the buttons, or zoom with the scroll wheel or a pinch: months for decades, weeks for
           years, days for months. Hover to see each value and which publisher it came from.
         </p>
       </header>
