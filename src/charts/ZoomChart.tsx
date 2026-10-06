@@ -18,7 +18,7 @@ import {
   type ISeriesApi,
   type LogicalRange,
   type MouseEventParams,
-  type Range,
+  type IRange,
   type SeriesType,
   type Time,
 } from "lightweight-charts";
@@ -120,7 +120,7 @@ export default function ZoomChart({
       };
     };
 
-    const load = async (interval: Interval, from: string, to: string, keep: Range<Time> | null) => {
+    const load = async (interval: Interval, from: string, to: string, keep: IRange<Time> | null) => {
       const mine = ++seq;
       try {
         const loaded = await loader(interval, from, to);
@@ -161,7 +161,7 @@ export default function ZoomChart({
         const want = pickInterval(span);
         const covered = (current.from <= from || current.from <= first) && (current.to >= to || current.to >= today);
         if (want === current.interval && covered) return;
-        const keep: Range<Time> = { from: from as Time, to: to as Time };
+        const keep: IRange<Time> = { from: from as Time, to: to as Time };
         if (want === "month") void load(want, first, today, keep);
         else void load(want, clamp(addDays(from, -span)), clamp(addDays(to, span)), keep);
       }, DEBOUNCE_MS);
