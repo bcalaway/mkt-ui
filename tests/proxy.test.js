@@ -12,7 +12,8 @@ beforeAll(async () => {
       res.writeHead(404, { "content-type": "application/json" });
       return res.end(JSON.stringify({ detail: "no instrument named 'NOPE'" }));
     }
-    res.writeHead(200, { "content-type": "application/json", "server-timing": "api;dur=5.0, upstream;dur=4.0" });
+    const cache = req.url.startsWith("/api/bars") ? { "cache-control": "private, max-age=86400" } : {};
+    res.writeHead(200, { "content-type": "application/json", "server-timing": "api;dur=5.0, upstream;dur=4.0", ...cache });
     res.end(JSON.stringify({ url: req.url }));
   });
   await new Promise((resolve) => fake.listen(0, "127.0.0.1", resolve));
@@ -33,6 +34,11 @@ describe("the /api proxy to mkt-api", () => {
     expect(res.status).toBe(200);
     expect(res.body.url).toBe("/api/series?name=UST-2Y-CMT&name=UST-10Y-CMT&start=2026-01-01");
     expect(res.headers["server-timing"]).toMatch(/^api;dur=5\.0, upstream;dur=4\.0, proxy;dur=[\d.]+$/);
+  });
+
+  it("passes mkt-api's Cache-Control through", async () => {
+    const res = await request(app).get("/api/bars?series=UST-10Y-CMT&interval=month&block=1990");
+    expect(res.headers["cache-control"]).toBe("private, max-age=86400");
   });
 
   it("passes mkt-api's errors through", async () => {

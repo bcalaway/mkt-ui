@@ -87,6 +87,9 @@ export function createApp() {
       // mkt-api's own timings, plus this hop's total, for pages that show where time goes.
       const timing = [upstream.headers.get("server-timing"), `proxy;dur=${(performance.now() - t0).toFixed(1)}`];
       res.set("Server-Timing", timing.filter(Boolean).join(", "));
+      // mkt-api says how long an answer keeps (a finished block of bars: a day).
+      const cacheControl = upstream.headers.get("cache-control");
+      if (cacheControl) res.set("Cache-Control", cacheControl);
       res.status(upstream.status).type("application/json").send(body);
     } catch (err) {
       res.status(502).json({ detail: `mkt-api didn't answer: ${err.message}` });
