@@ -11,20 +11,9 @@ import { useChartTheme } from "./theme";
 
 echarts.use([LineChart, DataZoomComponent, GridComponent, LegendComponent, TooltipComponent, SVGRenderer]);
 
-// Zoom the tenor axis about its middle (dataZoom percentages); factor 0.5 halves what's shown.
-function zoomTenors(chart: echarts.ECharts | null, factor: number | null) {
-  if (!chart) return;
-  if (factor === null) {
-    chart.dispatchAction({ type: "dataZoom", start: 0, end: 100 });
-    return;
-  }
-  const dz = (chart.getOption() as { dataZoom?: { start?: number; end?: number }[] }).dataZoom?.[0];
-  const start = dz?.start ?? 0;
-  const end = dz?.end ?? 100;
-  const mid = (start + end) / 2;
-  const half = Math.min(50, Math.max(5, ((end - start) / 2) * factor));
-  const lo = Math.max(0, Math.min(100 - 2 * half, mid - half));
-  chart.dispatchAction({ type: "dataZoom", start: lo, end: lo + 2 * half });
+// Back to every tenor after zooming in with the wheel or a pinch.
+function showAllTenors(chart: echarts.ECharts | null) {
+  chart?.dispatchAction({ type: "dataZoom", start: 0, end: 100 });
 }
 
 export interface CurveLine {
@@ -113,11 +102,7 @@ export default function CurveChart({ tenors, lines, height = 380 }: { tenors: st
   return (
     <div className="chart chart-frame">
       <div ref={box} style={{ height }} />
-      <ChartToolbar
-        onZoomIn={() => zoomTenors(chartRef.current, 0.5)}
-        onZoomOut={() => zoomTenors(chartRef.current, 2)}
-        onReset={() => zoomTenors(chartRef.current, null)}
-      />
+      <ChartToolbar onAll={() => showAllTenors(chartRef.current)} />
     </div>
   );
 }
