@@ -1,10 +1,13 @@
-// Two ways to chart all of history and zoom in, side by side, to choose one
-// (Bill, 2026-10-06). Both open on monthly bars back to 1962 and get finer
-// as you zoom (weekly within ~15 years on screen, daily within ~3).
+// Two ways to chart all of history and zoom in, one at a time so they don't
+// compete, to choose one (Bill, 2026-10-06). Both open on monthly bars back
+// to 1962 and get finer as you zoom (weekly within ~15 years on screen, daily
+// within ~3). Each request's time is split into mkt-api's own, the part
+// spent waiting on quote-svc and secmaster-svc, and the network.
 //   A: asks mkt-api for bars at each zoom level, for the window on screen.
 //   B: loads every day once (/api/series/daily) and makes the bars here.
 import { useCallback, useMemo, useRef, useState } from "react";
-import { apiGet, type Ok } from "../../api/client";
+import { apiGet, serverTiming, type Ok } from "../../api/client";
+import type { Preset } from "../../charts/ChartToolbar";
 import { toBars, type Interval } from "../../charts/bars";
 import { MAX_SERIES } from "../../charts/theme";
 import type { TimeLine } from "../../charts/TimeSeriesChart";
@@ -17,24 +20,49 @@ const FIRST = "1962-01-01";
 const CHOICES = ["UST-3M-CMT", "UST-2Y-CMT", "UST-5Y-CMT", "UST-10Y-CMT", "UST-30Y-CMT"];
 const INTERVAL_LABEL: Record<Interval, string> = { day: "daily", week: "weekly", month: "monthly", quarter: "quarterly", year: "yearly" };
 
+const PRESETS: Preset[] = [
+  { label: "10Y", days: 3653 },
+  { label: "2Y", days: 731 },
+  { label: "3M", days: 92 },
+];
+
+interface Timing {
+  totalMs: number; // in the browser: request to parsed answer
+  apiMs?: number; // mkt-api's own time
+  upstreamMs?: number; // of which waiting on quote-svc and secmaster-svc
+  interval: Interval;
+}
+
 interface Stats {
   requests: number;
   bytes: number;
-  lastMs: number | null;
+  last: Timing | null;
 }
 
+const EMPTY: Stats = { requests: 0, bytes: 0, last: null };
+
 function useStats() {
-  const ref = useRef<Stats>({ requests: 0, bytes: 0, lastMs: null });
-  const [stats, setStats] = useState<Stats>(ref.current);
-  const record = useCallback((bytes: number, ms: number) => {
-    ref.current = { requests: ref.current.requests + 1, bytes: ref.current.bytes + bytes, lastMs: ms };
+  const ref = useRef<Stats>(EMPTY);
+  const [stats, setStats] = useState<Stats>(EMPTY);
+  const record = useCallback((bytes: number, last: Timing) => {
+    ref.current = { requests: ref.current.requests + 1, bytes: ref.current.bytes + bytes, last };
     setStats(ref.current);
   }, []);
   const reset = useCallback(() => {
-    ref.current = { requests: 0, bytes: 0, lastMs: null };
-    setStats(ref.current);
+    ref.current = EMPTY;
+    setStats(EMPTY);
   }, []);
   return { stats, record, reset };
+}
+
+/** Time a request and read its Server-Timing. */
+async function timed<T>(interval: Interval, run: (onResponse: (res: Response) => void) => Promise<T>): Promise<[T, Timing]> {
+  const t0 = performance.now();
+  let st: Record<string, number> = {};
+  const body = await run((res) => {
+    st = serverTiming(res);
+  });
+  return [body, { totalMs: Math.round(performance.now() - t0), apiMs: st.api, upstreamMs: st.upstream, interval }];
 }
 
 function bytesOf(body: unknown): number {
@@ -46,14 +74,27 @@ function note(interval: Interval, open: string, high: string, low: string, last:
   return interval === "day" ? src : `open ${open}, high ${high}, low ${low}; close on ${last} (${src})`;
 }
 
-function StatsLine({ stats, interval, extra }: { stats: Stats; interval: Interval | null; extra?: string }) {
+function StatsLine({ stats, interval }: { stats: Stats; interval: Interval | null }) {
+  const last = stats.last;
   return (
-    <p className="muted chart-note">
-      Showing {interval ? `${INTERVAL_LABEL[interval]} bars` : "…"}. {stats.requests} request{stats.requests === 1 ? "" : "s"},{" "}
-      {(stats.bytes / 1024).toFixed(0)} KB
-      {stats.lastMs !== null ? `, the last in ${stats.lastMs} ms` : ""}
-      {extra ? `. ${extra}` : "."}
-    </p>
+    <div className="lab-stats" aria-live="polite">
+      <p>
+        Showing <strong>{interval ? `${INTERVAL_LABEL[interval]} bars` : "…"}</strong>. {stats.requests} request
+        {stats.requests === 1 ? "" : "s"} so far, {(stats.bytes / 1024).toFixed(0)} KB in all.
+      </p>
+      {last && (
+        <p className="muted">
+          Last request ({INTERVAL_LABEL[last.interval]}): {last.totalMs} ms in all
+          {last.apiMs !== undefined && (
+            <>
+              ; mkt-api {Math.round(last.apiMs)} ms, of which {Math.round(last.upstreamMs ?? 0)} ms waiting on quote-svc;
+              the network and the browser the other {Math.max(0, last.totalMs - Math.round(last.apiMs))} ms
+            </>
+          )}
+          .
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -63,15 +104,17 @@ function LabPage({ location }: { location: Location }) {
   const ohlc = location.query.get("style") === "ohlc";
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const key = names.join(",");
+  const approach = location.query.get("approach") === "b" ? "b" : "a";
 
   // A: bars from mkt-api, one request per zoom level and window.
   const a = useStats();
   const [aInterval, setAInterval] = useState<Interval | null>(null);
   const loaderA = useCallback<Loader>(
     async (interval, from, to) => {
-      const t0 = performance.now();
-      const r = await apiGet("/api/series", { query: { name: key.split(","), start: from, end: to, interval } });
-      a.record(bytesOf(r), Math.round(performance.now() - t0));
+      const [r, timing] = await timed(interval, (onResponse) =>
+        apiGet("/api/series", { query: { name: key.split(","), start: from, end: to, interval }, onResponse }),
+      );
+      a.record(bytesOf(r), timing);
       const lines: TimeLine[] = r.series.map((s, i) => ({
         key: s.name,
         label: shortTenor(s.name),
@@ -97,9 +140,10 @@ function LabPage({ location }: { location: Location }) {
   const loaderB = useCallback<Loader>(
     async (interval) => {
       if (!daily.current || daily.current.key !== key) {
-        const t0 = performance.now();
-        const data = apiGet("/api/series/daily", { query: { name: key.split(","), start: FIRST } }).then((r) => {
-          b.record(bytesOf(r), Math.round(performance.now() - t0));
+        const data = timed("day", (onResponse) =>
+          apiGet("/api/series/daily", { query: { name: key.split(","), start: FIRST }, onResponse }),
+        ).then(([r, timing]) => {
+          b.record(bytesOf(r), timing);
           return r;
         });
         daily.current = { key, data };
@@ -144,8 +188,9 @@ function LabPage({ location }: { location: Location }) {
       <header className="screen-head">
         <h1>Zoom lab</h1>
         <p className="lede">
-          Two ways to show all of history and zoom in fast. Both open on monthly bars back to 1962; scroll or pinch to
-          zoom, drag to pan. Pick the one that feels better and the other goes.
+          Two ways to show all of history and zoom in fast, one at a time. Both open on monthly bars back to 1962; zoom
+          with the buttons (10Y, 2Y and 3M jump there), the scroll wheel or a pinch, and drag to pan. Weekly bars appear
+          once about 15 years are on screen, daily ones under about 3.
         </p>
       </header>
       <div className="controls" role="group" aria-label="Tenors and style">
@@ -164,15 +209,35 @@ function LabPage({ location }: { location: Location }) {
         </button>
       </div>
 
-      <h2>A: ask the API at each zoom</h2>
-      <p className="muted">Small answers, but the first zoom into a new stretch waits for one.</p>
-      <ZoomChart loader={loaderA} first={FIRST} today={today} unit="%" bars={ohlc} onInterval={setAInterval} />
-      <StatsLine stats={a.stats} interval={aInterval} />
+      <div className="controls" role="group" aria-label="Approach">
+        <span className="control-label">Approach</span>
+        <button type="button" className="chip" aria-pressed={approach === "a"} onClick={() => setQuery({ approach: null })}>
+          A: ask at each zoom
+        </button>
+        <button type="button" className="chip" aria-pressed={approach === "b"} onClick={() => setQuery({ approach: "b" })}>
+          B: load every day once
+        </button>
+      </div>
 
-      <h2>B: load every day once</h2>
-      <p className="muted">One bigger answer up front; after that every zoom is made here, with no waiting.</p>
-      <ZoomChart loader={loaderB} first={FIRST} today={today} unit="%" bars={ohlc} onInterval={setBInterval} />
-      <StatsLine stats={b.stats} interval={bInterval} extra="Later zooms ask nothing" />
+      {approach === "a" ? (
+        <>
+          <p className="muted">
+            Asks mkt-api for bars at each zoom level, for the window on screen and as much again either side: small answers,
+            but the first zoom into a new stretch waits for one.
+          </p>
+          <ZoomChart key={`a:${key}`} loader={loaderA} first={FIRST} today={today} unit="%" bars={ohlc} onInterval={setAInterval} presets={PRESETS} />
+          <StatsLine stats={a.stats} interval={aInterval} />
+        </>
+      ) : (
+        <>
+          <p className="muted">
+            Loads every day since 1962 once and makes the bars here: one bigger answer up front, then every zoom is made in the
+            browser with no further requests.
+          </p>
+          <ZoomChart key={`b:${key}`} loader={loaderB} first={FIRST} today={today} unit="%" bars={ohlc} onInterval={setBInterval} presets={PRESETS} />
+          <StatsLine stats={b.stats} interval={bInterval} />
+        </>
+      )}
     </section>
   );
 }

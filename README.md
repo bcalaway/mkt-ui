@@ -18,10 +18,10 @@ Each screen is a self-contained module under `src/screens/` that registers its r
 
 - **Curve** (`/`): the Treasury curve on a date (default the latest) against the same curve 1W, 1M, 3M or 1Y earlier, with a table of the values and exact changes in basis points.
 - **Over time** (`/series`): up to four tenors over 1M to all of history, as lines or OHLC bars (daily up to a year, weekly for 5 and 10 years, monthly for all of history, so the whole range always fits), best available or one publisher's values, the source on hover; the 2s10s or 3m10y spread below in basis points.
-- **Zoom lab** (`/lab/zoom`): two ways to open on all of history and get finer as you zoom, side by side, to choose one (Bill, 2026-10-06): A asks mkt-api for bars at each zoom level (`/api/series?interval=`); B loads every day once (`/api/series/daily`) and makes the bars in the browser. Each shows its requests and bytes.
+- **Zoom lab** (`/lab/zoom`): two ways to open on all of history and get finer as you zoom, side by side, to choose one (Bill, 2026-10-06): A asks mkt-api for bars at each zoom level (`/api/series?interval=`); B loads every day once (`/api/series/daily`) and makes the bars in the browser. One at a time, with 10Y / 2Y / 3M jumps; each shows its requests, bytes and the last request's time split into mkt-api's, quote-svc's and the network's (from `Server-Timing`, which the server passes through from mkt-api with its own `proxy` time added).
 - **Instruments** (`/instruments`, `/instruments/UST-10Y-CMT`): search by short name, alias or any source's key; an instrument's identifiers, notes and latest value.
 
-Charts: TradingView Lightweight Charts for time series, ECharts for the curve, each behind the UI's own component (`src/charts/`) so either can be swapped. Colors are the data-viz reference palette's first four categorical slots, light and dark (`src/charts/theme.ts`); every chart has a legend or table beside it.
+Charts: TradingView Lightweight Charts for time series, ECharts for the curve, each behind the UI's own component (`src/charts/`) so either can be swapped. Every chart has the same toolbar (`src/charts/ChartToolbar.tsx`): zoom in, zoom out and reset, plus jumps to a span where a chart offers them. Colors are the data-viz reference palette's first four categorical slots, light and dark (`src/charts/theme.ts`); every chart has a legend or table beside it.
 
 ## The API and its types
 

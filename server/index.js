@@ -77,12 +77,17 @@ export function createApp() {
     const url = new URL(config.mktApiUrl);
     url.pathname = req.path;
     url.search = new URL(req.originalUrl, "http://x").search;
+    const t0 = performance.now();
     try {
       const upstream = await fetch(url, {
         headers: { accept: "application/json" },
         signal: AbortSignal.timeout(config.mktApiTimeoutMs),
       });
-      res.status(upstream.status).type("application/json").send(await upstream.text());
+      const body = await upstream.text();
+      // mkt-api's own timings, plus this hop's total, for pages that show where time goes.
+      const timing = [upstream.headers.get("server-timing"), `proxy;dur=${(performance.now() - t0).toFixed(1)}`];
+      res.set("Server-Timing", timing.filter(Boolean).join(", "));
+      res.status(upstream.status).type("application/json").send(body);
     } catch (err) {
       res.status(502).json({ detail: `mkt-api didn't answer: ${err.message}` });
     }

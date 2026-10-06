@@ -4,11 +4,28 @@
 import { useEffect, useRef } from "react";
 import * as echarts from "echarts/core";
 import { LineChart } from "echarts/charts";
-import { GridComponent, LegendComponent, TooltipComponent } from "echarts/components";
+import { DataZoomComponent, GridComponent, LegendComponent, TooltipComponent } from "echarts/components";
 import { SVGRenderer } from "echarts/renderers";
+import ChartToolbar from "./ChartToolbar";
 import { useChartTheme } from "./theme";
 
-echarts.use([LineChart, GridComponent, LegendComponent, TooltipComponent, SVGRenderer]);
+echarts.use([LineChart, DataZoomComponent, GridComponent, LegendComponent, TooltipComponent, SVGRenderer]);
+
+// Zoom the tenor axis about its middle (dataZoom percentages); factor 0.5 halves what's shown.
+function zoomTenors(chart: echarts.ECharts | null, factor: number | null) {
+  if (!chart) return;
+  if (factor === null) {
+    chart.dispatchAction({ type: "dataZoom", start: 0, end: 100 });
+    return;
+  }
+  const dz = (chart.getOption() as { dataZoom?: { start?: number; end?: number }[] }).dataZoom?.[0];
+  const start = dz?.start ?? 0;
+  const end = dz?.end ?? 100;
+  const mid = (start + end) / 2;
+  const half = Math.min(50, Math.max(5, ((end - start) / 2) * factor));
+  const lo = Math.max(0, Math.min(100 - 2 * half, mid - half));
+  chart.dispatchAction({ type: "dataZoom", start: lo, end: lo + 2 * half });
+}
 
 export interface CurveLine {
   key: string;
@@ -21,15 +38,19 @@ export interface CurveLine {
 export default function CurveChart({ tenors, lines, height = 380 }: { tenors: string[]; lines: CurveLine[]; height?: number }) {
   const theme = useChartTheme();
   const box = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<echarts.ECharts | null>(null);
 
   useEffect(() => {
     if (!box.current) return;
     const chart = echarts.init(box.current, undefined, { renderer: "svg" });
+    chartRef.current = chart;
     const color = (slot: number) => theme.series[slot % theme.series.length];
     chart.setOption({
       backgroundColor: theme.surface,
       textStyle: { fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif', color: theme.inkSecondary },
       grid: { left: 56, right: 120, top: 48, bottom: 40 },
+      // Wheel and pinch zoom the tenors; the toolbar does the same with buttons.
+      dataZoom: [{ type: "inside", xAxisIndex: 0, filterMode: "none" }],
       legend: { top: 8, left: 56, textStyle: { color: theme.inkSecondary }, icon: "roundRect", itemWidth: 14, itemHeight: 4 },
       tooltip: {
         trigger: "axis",
@@ -84,9 +105,19 @@ export default function CurveChart({ tenors, lines, height = 380 }: { tenors: st
     window.addEventListener("resize", resize);
     return () => {
       window.removeEventListener("resize", resize);
+      chartRef.current = null;
       chart.dispose();
     };
   }, [tenors, lines, theme]);
 
-  return <div ref={box} className="chart" style={{ height }} />;
+  return (
+    <div className="chart chart-frame">
+      <div ref={box} style={{ height }} />
+      <ChartToolbar
+        onZoomIn={() => zoomTenors(chartRef.current, 0.5)}
+        onZoomOut={() => zoomTenors(chartRef.current, 2)}
+        onReset={() => zoomTenors(chartRef.current, null)}
+      />
+    </div>
+  );
 }

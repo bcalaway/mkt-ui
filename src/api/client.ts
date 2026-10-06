@@ -40,7 +40,7 @@ function queryString(query: Record<string, unknown> | undefined): string {
 
 export async function apiGet<P extends keyof paths>(
   path: P,
-  options: { query?: Query<P>; path?: PathParams<P>; signal?: AbortSignal } = {},
+  options: { query?: Query<P>; path?: PathParams<P>; signal?: AbortSignal; onResponse?: (res: Response) => void } = {},
 ): Promise<Ok<P>> {
   let url = String(path);
   for (const [k, v] of Object.entries((options.path ?? {}) as Record<string, string>)) {
@@ -50,10 +50,21 @@ export async function apiGet<P extends keyof paths>(
     headers: { accept: "application/json" },
     signal: options.signal,
   });
+  options.onResponse?.(res);
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
     const detail = typeof body?.detail === "string" ? body.detail : res.statusText;
     throw new ApiError(res.status, detail || `HTTP ${res.status}`);
   }
   return body as Ok<P>;
+}
+
+/** A Server-Timing header as name -> milliseconds ("api;dur=5.0, upstream;dur=4.0"). */
+export function serverTiming(res: Response): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const part of (res.headers.get("server-timing") ?? "").split(",")) {
+    const m = /^\s*([\w-]+)\s*;\s*dur=([\d.]+)/.exec(part);
+    if (m) out[m[1]] = Number(m[2]);
+  }
+  return out;
 }

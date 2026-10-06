@@ -174,3 +174,27 @@ code { font-size: 0.875rem; }
 
 .chart-note { font-size: 0.875rem; margin: 0.25rem 0 0.75rem; }
 .chart-error { position: absolute; top: 0.5rem; left: 0.75rem; margin: 0; }
+
+.chart-toolbar {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  display: flex;
+  gap: 4px;
+}
+button.tool {
+  background: var(--surface);
+  color: var(--ink-2);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  min-width: 2rem;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+button.tool:hover { color: var(--ink); border-color: var(--ink-2); }
+.chart-frame { position: relative; }
+
+.lab-stats { margin: 0.5rem 0 1rem; font-size: 0.9375rem; }
+.lab-stats p { margin: 0.15rem 0; }
