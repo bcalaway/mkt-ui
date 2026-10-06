@@ -1,23 +1,25 @@
-// Lines over time (TradingView Lightweight Charts): yields or spreads. The
-// library only plots; the tooltip shows each value's original string, never
-// a float formatted back. One y-axis per chart: yields and spreads (different
-// units) are separate charts.
+// Yields or spreads over time (TradingView Lightweight Charts), as lines or as
+// OHLC bars. The library only plots; the tooltip shows each value's original
+// string, never a float formatted back. One y-axis per chart: yields and
+// spreads (different units) are separate charts. Bars take their line's color
+// whichever way they move: green and red are kept for status, not direction.
 import { useEffect, useRef, useState } from "react";
 import {
+  BarSeries,
   ColorType,
   CrosshairMode,
   LineSeries,
   createChart,
   type IChartApi,
-  type ISeriesApi,
   type MouseEventParams,
   type Time,
 } from "lightweight-charts";
 import { useChartTheme } from "./theme";
 
 export interface TimePoint {
-  date: string; // YYYY-MM-DD
-  plot: number; // for drawing only
+  date: string; // YYYY-MM-DD: the day, or a bar's first calendar day
+  plot: number; // the close, for drawing only
+  bar?: { open: number; high: number; low: number }; // for drawing bars only
   text: string; // what the tooltip shows, as the API gave it
   note?: string; // e.g. the source
 }
@@ -41,7 +43,17 @@ function timeToIso(t: Time): string {
   return `${t.year}-${String(t.month).padStart(2, "0")}-${String(t.day).padStart(2, "0")}`;
 }
 
-export default function TimeSeriesChart({ lines, unit, height = 360 }: { lines: TimeLine[]; unit: string; height?: number }) {
+export default function TimeSeriesChart({
+  lines,
+  unit,
+  bars = false,
+  height = 360,
+}: {
+  lines: TimeLine[];
+  unit: string;
+  bars?: boolean;
+  height?: number;
+}) {
   const theme = useChartTheme();
   const box = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState<Hover | null>(null);
@@ -59,20 +71,29 @@ export default function TimeSeriesChart({ lines, unit, height = 360 }: { lines: 
       },
       grid: { vertLines: { visible: false }, horzLines: { color: theme.grid } },
       rightPriceScale: { borderColor: theme.axis },
-      timeScale: { borderColor: theme.axis },
+      // Small enough that fitting the content shows every point, never a panning window.
+      timeScale: { borderColor: theme.axis, minBarSpacing: 0.05 },
       crosshair: { mode: CrosshairMode.Magnet },
       localization: { priceFormatter: (v: number) => `${v.toFixed(unit === "bp" ? 0 : 2)}${unit === "bp" ? "" : "%"}` },
     });
-    const byLine: { line: TimeLine; series: ISeriesApi<"Line">; byDate: Map<string, TimePoint> }[] = lines.map((line) => {
-      const series = chart.addSeries(LineSeries, {
-        color: theme.series[line.slot % theme.series.length],
-        lineWidth: 2,
-        priceLineVisible: false,
-        lastValueVisible: true,
-        title: line.label,
-      });
-      series.setData(line.points.map((p) => ({ time: p.date as Time, value: p.plot })));
-      return { line, series, byDate: new Map(line.points.map((p) => [p.date, p])) };
+    const byLine: { line: TimeLine; byDate: Map<string, TimePoint> }[] = lines.map((line) => {
+      const color = theme.series[line.slot % theme.series.length];
+      if (bars) {
+        const s = chart.addSeries(BarSeries, { upColor: color, downColor: color, priceLineVisible: false, title: line.label });
+        s.setData(
+          line.points.map((p) => ({
+            time: p.date as Time,
+            open: p.bar?.open ?? p.plot,
+            high: p.bar?.high ?? p.plot,
+            low: p.bar?.low ?? p.plot,
+            close: p.plot,
+          })),
+        );
+      } else {
+        const s = chart.addSeries(LineSeries, { color, lineWidth: 2, priceLineVisible: false, lastValueVisible: true, title: line.label });
+        s.setData(line.points.map((p) => ({ time: p.date as Time, value: p.plot })));
+      }
+      return { line, byDate: new Map(line.points.map((p) => [p.date, p])) };
     });
     chart.timeScale().fitContent();
 
@@ -98,7 +119,7 @@ export default function TimeSeriesChart({ lines, unit, height = 360 }: { lines: 
       chart.unsubscribeCrosshairMove(onMove);
       chart.remove();
     };
-  }, [lines, unit, height, theme]);
+  }, [lines, unit, bars, height, theme]);
 
   return (
     <div className="chart" style={{ position: "relative" }}>

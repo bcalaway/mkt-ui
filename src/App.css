@@ -171,3 +171,6 @@ code { font-size: 0.875rem; }
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; transition: none !important; }
 }
+
+.chart-note { font-size: 0.875rem; margin: 0.25rem 0 0.75rem; }
+.chart-error { position: absolute; top: 0.5rem; left: 0.75rem; margin: 0; }

@@ -4,17 +4,19 @@ import { apiGet, type InstrumentSummary, type SeriesResponse, type SpreadRespons
 import TimeSeriesChart, { type TimeLine } from "../../charts/TimeSeriesChart";
 import { MAX_SERIES } from "../../charts/theme";
 import { SOURCE_LABEL, before, shortTenor } from "../../format";
-import { useQueryUpdater, type Location } from "../../router";
+import { linkProps, useQueryUpdater, type Location } from "../../router";
 import type { Screen } from "../types";
 
-const RANGES: { key: string; months: number | null }[] = [
-  { key: "1M", months: 1 },
-  { key: "6M", months: 6 },
-  { key: "1Y", months: 12 },
-  { key: "5Y", months: 60 },
-  { key: "10Y", months: 120 },
-  { key: "All", months: null },
+// Each range's bars: about 800 or fewer, so the whole range fits the chart.
+const RANGES: { key: string; months: number | null; interval: "day" | "week" | "month" }[] = [
+  { key: "1M", months: 1, interval: "day" },
+  { key: "6M", months: 6, interval: "day" },
+  { key: "1Y", months: 12, interval: "day" },
+  { key: "5Y", months: 60, interval: "week" },
+  { key: "10Y", months: 120, interval: "week" },
+  { key: "All", months: null, interval: "month" },
 ];
+const INTERVAL_LABEL = { day: "daily", week: "weekly", month: "monthly" };
 const SPREADS: { key: string; long: string; short: string; label: string }[] = [
   { key: "2s10s", long: "UST-10Y-CMT", short: "UST-2Y-CMT", label: "10-year minus 2-year" },
   { key: "3m10y", long: "UST-10Y-CMT", short: "UST-3M-CMT", label: "10-year minus 3-month" },
@@ -22,10 +24,14 @@ const SPREADS: { key: string; long: string; short: string; label: string }[] = [
 const DEFAULT_NAMES = ["UST-2Y-CMT", "UST-10Y-CMT"];
 const FIRST_DATE = "1962-01-01";
 
-function useRange(key: string): { start: string; end: string } {
+function rangeFor(key: string): { start: string; end: string; interval: "day" | "week" | "month" } {
   const today = new Date();
   const range = RANGES.find((r) => r.key === key) ?? RANGES[2];
-  return { start: range.months === null ? FIRST_DATE : before(today, range.months), end: today.toISOString().slice(0, 10) };
+  return {
+    start: range.months === null ? FIRST_DATE : before(today, range.months),
+    end: today.toISOString().slice(0, 10),
+    interval: range.interval,
+  };
 }
 
 function SeriesPage({ location }: { location: Location }) {
@@ -36,7 +42,8 @@ function SeriesPage({ location }: { location: Location }) {
   const rangeKey = location.query.get("range") ?? "1Y";
   const source = location.query.get("source") ?? "";
   const spreadKey = location.query.get("spread") ?? "2s10s";
-  const { start, end } = useRange(rangeKey);
+  const { start, end, interval } = rangeFor(rangeKey);
+  const ohlc = location.query.get("style") === "ohlc";
 
   const [instruments, setInstruments] = useState<InstrumentSummary[]>([]);
   const [series, setSeries] = useState<SeriesResponse | null>(null);
@@ -51,12 +58,12 @@ function SeriesPage({ location }: { location: Location }) {
     if (!names.length) return;
     const ctl = new AbortController();
     setError(null);
-    apiGet("/api/series", { query: { name: names, start, end, source: source || undefined }, signal: ctl.signal })
+    apiGet("/api/series", { query: { name: names, start, end, interval, source: source || undefined }, signal: ctl.signal })
       .then(setSeries)
       .catch((e: Error) => e.name !== "AbortError" && setError(e.message));
     return () => ctl.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [names.join(","), start, end, source]);
+  }, [names.join(","), start, end, interval, source]);
 
   const spreadDef = SPREADS.find((s) => s.key === spreadKey);
   useEffect(() => {
@@ -65,11 +72,11 @@ function SeriesPage({ location }: { location: Location }) {
       return;
     }
     const ctl = new AbortController();
-    apiGet("/api/spread", { query: { long: spreadDef.long, short: spreadDef.short, start, end }, signal: ctl.signal })
+    apiGet("/api/spread", { query: { long: spreadDef.long, short: spreadDef.short, start, end, interval }, signal: ctl.signal })
       .then(setSpread)
       .catch((e: Error) => e.name !== "AbortError" && setError(e.message));
     return () => ctl.abort();
-  }, [spreadDef, start, end]);
+  }, [spreadDef, start, end, interval]);
 
   // A line keeps its color while others come and go.
   const slotOf = (name: string) => Math.max(0, slots.indexOf(name));
@@ -82,8 +89,12 @@ function SeriesPage({ location }: { location: Location }) {
         points: s.points.map((p) => ({
           date: p.date,
           plot: Number(p.percent),
+          bar: { open: Number(p.open_percent), high: Number(p.high_percent), low: Number(p.low_percent) },
           text: `${p.percent}%`,
-          note: SOURCE_LABEL[p.source] ?? p.source,
+          note:
+            series?.interval === "day"
+              ? SOURCE_LABEL[p.source] ?? p.source
+              : `open ${p.open_percent}, high ${p.high_percent}, low ${p.low_percent}; close on ${p.last_date}`,
         })),
       })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -96,7 +107,16 @@ function SeriesPage({ location }: { location: Location }) {
             key: spread.name,
             label: spreadDef?.key ?? spread.name,
             slot: 0,
-            points: spread.points.map((p) => ({ date: p.date, plot: Number(p.bp), text: `${p.bp} bp`, note: `${p.long}% − ${p.short}%` })),
+            points: spread.points.map((p) => ({
+              date: p.date,
+              plot: Number(p.bp),
+              bar: { open: Number(p.open_bp), high: Number(p.high_bp), low: Number(p.low_bp) },
+              text: `${p.bp} bp`,
+              note:
+                spread.interval === "day"
+                  ? `${p.long}% − ${p.short}%`
+                  : `open ${p.open_bp}, high ${p.high_bp}, low ${p.low_bp}; close on ${p.last_date}`,
+            })),
           }]
         : [],
     [spread, spreadDef],
@@ -150,6 +170,13 @@ function SeriesPage({ location }: { location: Location }) {
             {r.key}
           </button>
         ))}
+        <span className="control-label">Show</span>
+        <button type="button" className="chip" aria-pressed={!ohlc} onClick={() => setQuery({ style: null })}>
+          Lines
+        </button>
+        <button type="button" className="chip" aria-pressed={ohlc} onClick={() => setQuery({ style: "ohlc" })}>
+          OHLC bars
+        </button>
         <label>
           Source
           <select value={source} onChange={(e) => setQuery({ source: e.target.value || null })}>
@@ -165,7 +192,11 @@ function SeriesPage({ location }: { location: Location }) {
       {series && (
         <>
           <Legend lines={lines} />
-          <TimeSeriesChart lines={lines} unit="%" />
+          <p className="muted chart-note">
+            {INTERVAL_LABEL[interval]} {ohlc ? "bars" : "closes"}, {series.start} to {series.end}. For finer detail
+            on a stretch of history, try the <a {...linkProps("/lab/zoom")}>zoom lab</a>.
+          </p>
+          <TimeSeriesChart lines={lines} unit="%" bars={ohlc} />
           <LatestTable series={series} />
         </>
       )}
@@ -183,8 +214,10 @@ function SeriesPage({ location }: { location: Location }) {
       </div>
       {spread && spreadDef && (
         <>
-          <p className="muted">{spreadDef.label}, in basis points, on days both have a value.</p>
-          <TimeSeriesChart lines={spreadLines} unit="bp" height={240} />
+          <p className="muted">
+            {spreadDef.label}, in basis points, on days both have a value ({INTERVAL_LABEL[interval]}).
+          </p>
+          <TimeSeriesChart lines={spreadLines} unit="bp" bars={ohlc} height={240} />
         </>
       )}
     </section>
@@ -224,8 +257,10 @@ function LatestTable({ series }: { series: SeriesResponse }) {
           return (
             <tr key={s.name}>
               <th scope="row">{shortTenor(s.name)}</th>
-              <td className="num">{first ? `${first.percent}% (${first.date})` : "–"}</td>
-              <td className="num">{last ? `${last.percent}% (${last.date})` : "–"}</td>
+              <td className="num">
+                {first ? `${first.open_percent}% (${series.interval === "day" ? first.date : `${series.interval} of ${first.date}`})` : "–"}
+              </td>
+              <td className="num">{last ? `${last.percent}% (${last.last_date})` : "–"}</td>
               <td className="muted">{last ? SOURCE_LABEL[last.source] ?? last.source : ""}</td>
             </tr>
           );

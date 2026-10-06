@@ -17,7 +17,8 @@ It runs on the home platform's AWS hub (`bcalaway/nyc_pa_aws_gitops`) as a regis
 Each screen is a self-contained module under `src/screens/` that registers its route in `src/screens/index.ts`; the address bar holds each view's state, so every view can be bookmarked.
 
 - **Curve** (`/`): the Treasury curve on a date (default the latest) against the same curve 1W, 1M, 3M or 1Y earlier, with a table of the values and exact changes in basis points.
-- **Over time** (`/series`): up to four tenors over 1M to all of history, best available or one publisher's values, the source on hover; the 2s10s or 3m10y spread below in basis points.
+- **Over time** (`/series`): up to four tenors over 1M to all of history, as lines or OHLC bars (daily up to a year, weekly for 5 and 10 years, monthly for all of history, so the whole range always fits), best available or one publisher's values, the source on hover; the 2s10s or 3m10y spread below in basis points.
+- **Zoom lab** (`/lab/zoom`): two ways to open on all of history and get finer as you zoom, side by side, to choose one (Bill, 2026-10-06): A asks mkt-api for bars at each zoom level (`/api/series?interval=`); B loads every day once (`/api/series/daily`) and makes the bars in the browser. Each shows its requests and bytes.
 - **Instruments** (`/instruments`, `/instruments/UST-10Y-CMT`): search by short name, alias or any source's key; an instrument's identifiers, notes and latest value.
 
 Charts: TradingView Lightweight Charts for time series, ECharts for the curve, each behind the UI's own component (`src/charts/`) so either can be swapped. Colors are the data-viz reference palette's first four categorical slots, light and dark (`src/charts/theme.ts`); every chart has a legend or table beside it.
