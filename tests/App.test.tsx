@@ -16,9 +16,9 @@ const ANSWERS: Record<string, unknown> = {
   "/api/curve": {
     curves: [
       { label: "latest", requested: "2026-10-03", date: "2026-10-02", missing: [],
-        points: [{ name: "UST-10Y-CMT", tenor: "P10Y", value: "0.041", percent: "4.10", source: "UST-PAR" }] },
+        points: [{ name: "UST-10Y-CMT", tenor: "P10Y", value: "0.041", display: "4.10", source: "UST-PAR" }] },
       { label: "1W", requested: "2026-09-26", date: "2026-09-25", missing: [],
-        points: [{ name: "UST-10Y-CMT", tenor: "P10Y", value: "0.0415", percent: "4.15", source: "UST-PAR" }] },
+        points: [{ name: "UST-10Y-CMT", tenor: "P10Y", value: "0.0415", display: "4.15", source: "UST-PAR" }] },
     ],
   },
 };

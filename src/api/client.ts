@@ -18,6 +18,7 @@ export type CurveResponse = Schemas["CurveResponse"];
 export type Curve = Schemas["CurveOut"];
 export type BarsResponse = Schemas["BarsResponse"];
 export type BarSeries = Schemas["BarSeriesOut"];
+export type Bar = Schemas["BarOut"];
 export type ChartEventOut = Schemas["EventOut"];
 
 export class ApiError extends Error {

@@ -47,7 +47,7 @@ function useEvents(series: string[], lines: (e: ChartEventOut) => string[]): { m
 
 interface LatestRow {
   name: string;
-  percent: string;
+  display: string; // in percent
   date: string;
   source: string;
 }
@@ -76,7 +76,7 @@ function SeriesPage({ location }: { location: Location }) {
     apiGet("/api/curve", { signal: ctl.signal })
       .then((r) =>
         setLatest(
-          (r.curves[0]?.points ?? []).map((p) => ({ name: p.name, percent: p.percent, date: r.curves[0].date ?? "", source: p.source })),
+          (r.curves[0]?.points ?? []).map((p) => ({ name: p.name, display: p.display, date: r.curves[0].date ?? "", source: p.source })),
         ),
       )
       .catch((e: Error) => e.name !== "AbortError" && setError(e.message));
@@ -282,7 +282,7 @@ function LatestTable({ rows }: { rows: LatestRow[] }) {
         {rows.map((r) => (
           <tr key={r.name}>
             <th scope="row">{shortTenor(r.name)}</th>
-            <td className="num">{r.percent}%</td>
+            <td className="num">{r.display}%</td>
             <td>{r.date}</td>
             <td className="muted">{SOURCE_LABEL[r.source] ?? r.source}</td>
           </tr>

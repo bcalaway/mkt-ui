@@ -24,7 +24,7 @@ Charts: TradingView Lightweight Charts for time series, ECharts for the curve, e
 
 ## The API and its types
 
-mkt-api's Swagger UI is at https://mkt.billandjessie.com/api/docs, through the same pass-through. The browser calls only this server: `/api/*` is passed to mkt-api (`MKT_API_URL`, default `http://mkt-api:8000`) for the signed-in user. Values arrive as decimal strings (`"4.10"`) and are shown as given; the one difference computed here (a curve's change in basis points) uses exact decimal arithmetic (`src/decimal.ts`), never floats.
+mkt-api's Swagger UI is at https://mkt.billandjessie.com/api/docs, through the same pass-through. The browser calls only this server: `/api/*` is passed to mkt-api (`MKT_API_URL`, default `http://mkt-api:8000`) for the signed-in user. Values arrive as decimals (`"0.041"`), each with a display form beside it in its unit (`"4.10"` percent, `"52"` bp); screens show and plot the display forms as given; the one difference computed here (a curve's change in basis points) uses exact decimal arithmetic (`src/decimal.ts`), never floats.
 
 The client is typed from mkt-api's OpenAPI schema: `api/openapi.json` is a copy of mkt-api's, `npm run gen:api` (run by `build` and `lint`) writes `src/api/schema.d.ts`, and `tsc --noEmit` in `lint` fails on anything that no longer fits. A test fails when mkt-api's `main` has a different schema, so an API change there is picked up here: copy the file over and fix what breaks.
 

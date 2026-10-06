@@ -121,7 +121,7 @@ function DetailPage({ name }: { name: string }) {
           </header>
           {inst.latest && (
             <p className="figure">
-              <span className="figure-value">{inst.latest.percent}%</span>
+              <span className="figure-value">{inst.latest.display}%</span>
               <span className="figure-note">
                 on {inst.latest.date}, from {SOURCE_LABEL[inst.latest.source] ?? inst.latest.source}.{" "}
                 <a {...linkProps(`/series?names=${encodeURIComponent(inst.name)}`)}>See it over time</a>
