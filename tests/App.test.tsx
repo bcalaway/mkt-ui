@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 // Charts draw on canvas/SVG measurements jsdom doesn't have: stand-ins here.
 vi.mock("../src/charts/CurveChart", () => ({ default: () => <div>curve chart</div> }));
-vi.mock("../src/charts/TimeSeriesChart", () => ({ default: () => <div>series chart</div> }));
+vi.mock("../src/charts/ZoomChart", () => ({ default: () => <div>series chart</div> }));
 
 import App from "../src/App";
 

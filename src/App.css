@@ -198,3 +198,4 @@ button.tool:hover { color: var(--ink); border-color: var(--ink-2); }
 
 .lab-stats { margin: 0.5rem 0 1rem; font-size: 0.9375rem; }
 .lab-stats p { margin: 0.15rem 0; }
+.load-stats { font-size: 0.8125rem; margin: 0.35rem 0 1rem; font-variant-numeric: tabular-nums; }

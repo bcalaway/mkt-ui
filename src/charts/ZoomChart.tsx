@@ -2,7 +2,7 @@
 // (TradingView Lightweight Charts). It asks its `loader` for bars at the
 // interval that suits what's on screen (months, weeks, days) and keeps the
 // same window in view when the data changes under it. Where the bars come
-// from is the loader's business: the Zoom lab tries two (asking mkt-api for
+// from is the loader's business (src/charts/loaders.ts: asking mkt-api for
 // each zoom level, or loading every day once and summing up in the browser).
 //
 // The chart's x-axis is evenly spaced by bar, not by time, so one load is
@@ -26,7 +26,7 @@ import { addDays, daysBetween, pickInterval, type Interval } from "./bars";
 import ChartToolbar, { type Preset } from "./ChartToolbar";
 import { zoomAboutMiddle } from "./zoom";
 import { useChartTheme } from "./theme";
-import type { TimeLine } from "./TimeSeriesChart";
+import type { TimeLine } from "./types";
 
 export interface Loaded {
   lines: TimeLine[];
@@ -59,6 +59,7 @@ export default function ZoomChart({
   height = 380,
   onInterval,
   presets = [],
+  initialDays = null,
 }: {
   loader: Loader;
   first: string; // the earliest date there could be data for
@@ -68,6 +69,7 @@ export default function ZoomChart({
   height?: number;
   onInterval?: (interval: Interval) => void;
   presets?: Preset[];
+  initialDays?: number | null; // open on the last n days; null opens on all of history
 }) {
   const theme = useChartTheme();
   const box = useRef<HTMLDivElement>(null);
@@ -191,15 +193,17 @@ export default function ZoomChart({
     chart.subscribeCrosshairMove(onMove);
 
     const reset = () => void load(pickInterval(daysBetween(first, today)), first, today, null);
-    actions.current = {
-      reset,
-      // Show the last n days on whatever is loaded; the zoom handler then loads finer bars for it.
-      showLast: (days: number) => {
-        const from = addDays(today, -days) < first ? first : addDays(today, -days);
-        chart.timeScale().setVisibleRange({ from: from as Time, to: today as Time });
-      },
+    // The last n days at the interval that suits them, loaded with as much again before (room to pan).
+    const showLast = (days: number) => {
+      const from = addDays(today, -days) < first ? first : addDays(today, -days);
+      const want = pickInterval(daysBetween(from, today));
+      const keep: IRange<Time> = { from: from as Time, to: today as Time };
+      if (want === "month") void load(want, first, today, keep);
+      else void load(want, addDays(from, -days) < first ? first : addDays(from, -days), today, keep);
     };
-    reset();
+    actions.current = { reset, showLast };
+    if (initialDays) showLast(initialDays);
+    else reset();
 
     return () => {
       alive = false;
@@ -209,7 +213,7 @@ export default function ZoomChart({
       chartRef.current = null;
       chart.remove();
     };
-  }, [loader, first, today, unit, bars, height, theme, onInterval]);
+  }, [loader, first, today, unit, bars, height, theme, onInterval, initialDays]);
 
   return (
     <div className="chart" style={{ position: "relative" }}>
