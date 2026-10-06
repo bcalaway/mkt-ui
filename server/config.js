@@ -1,7 +1,6 @@
 import crypto from "node:crypto";
 
-// APP_NAME must match this app's ECR repo / IAM role name / Postgres
-// database name / Route53 subdomain -- one name ties the whole platform
+// APP_NAME must match this app's ECR repo / IAM role name -- one name ties the whole platform
 // integration together, see docs/app-platform.md in nyc_pa_aws_gitops.
 export const config = {
   appName: process.env.APP_NAME || "app",
@@ -18,11 +17,10 @@ export const config = {
   // default is used only when login is off (local runs and tests).
   sessionSecret: sessionSecret(),
 
-  // Postgres (ADR-0016). POSTGRES_PASSWORD arrives via the platform's
-  // deploy-time .env convention -- unset locally means db-dependent
-  // features degrade gracefully instead of crashing (see server/db.js).
-  postgresHost: process.env.POSTGRES_HOST || "postgres",
-  postgresPassword: process.env.POSTGRES_PASSWORD || null,
+  // mkt-api, the market data API (internal: no route of its own). The server
+  // calls it for the signed-in user; the browser never does directly.
+  mktApiUrl: process.env.MKT_API_URL || "http://mkt-api:8000",
+  mktApiTimeoutMs: parseInt(process.env.MKT_API_TIMEOUT_MS || "20000", 10),
 
   // Authentik OIDC (ADR-0017, Pattern A). Both unset means auth stays off
   // entirely (app runs fully open) -- lets this template run standalone

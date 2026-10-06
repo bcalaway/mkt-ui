@@ -13,7 +13,6 @@ export default defineConfig({
     // server/index.js serves the built frontend itself, no proxy involved.
     proxy: {
       "/health": "http://localhost:8000",
-      "/db-check": "http://localhost:8000",
       "/login": "http://localhost:8000",
       "/auth/callback": "http://localhost:8000",
       "/api": "http://localhost:8000",

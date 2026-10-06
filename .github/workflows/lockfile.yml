@@ -1,0 +1,46 @@
+name: Lockfile
+
+# Brings package-lock.json in line with a PR's package.json and commits it to
+# the PR branch. Claude's sandbox can't reach the npm registry, so a PR that
+# adds or changes a dependency arrives with package.json only; `npm ci` (CI,
+# Docker) then needs the lockfile this writes. Dependabot's PRs already carry
+# their lockfile, so this finds nothing to do on them.
+#
+# A commit pushed with the workflow's token doesn't start other workflows,
+# so CI runs on the next push to the branch (or close and reopen the PR).
+
+on:
+  pull_request:
+    paths: [package.json]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  lockfile:
+    # Only branches in this repo: a fork's token can't push back.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Update package-lock.json
+        run: npm install --package-lock-only --ignore-scripts
+
+      - name: Commit it if it changed
+        run: |
+          if git diff --quiet package-lock.json; then
+            echo "package-lock.json already matches package.json"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "package-lock.json for package.json" package-lock.json
+          git push
