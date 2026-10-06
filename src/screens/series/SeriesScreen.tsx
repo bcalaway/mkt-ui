@@ -1,11 +1,11 @@
 // Yields over time for up to four tenors, and the curve's two common spreads.
 // Both charts open on the last year and zoom from all of history (since 1962)
-// down to days; how they load is a setting while both approaches are tried.
+// down to days, in cached blocks of bars from mkt-api.
 import { useEffect, useMemo, useState } from "react";
 import { apiGet, type ChartEventOut, type InstrumentSummary } from "../../api/client";
 import type { Preset } from "../../charts/ChartToolbar";
 import LoadStats, { useLoadStats } from "../../charts/LoadStats";
-import { APPROACH_LABEL, seriesLoader, spreadLoader, type Approach } from "../../charts/loaders";
+import { seriesLoader, spreadLoader } from "../../charts/loaders";
 import { MAX_SERIES } from "../../charts/theme";
 import type { ChartEvent } from "../../charts/types";
 import ZoomChart from "../../charts/ZoomChart";
@@ -60,7 +60,6 @@ function SeriesPage({ location }: { location: Location }) {
   const source = location.query.get("source") ?? "";
   const spreadKey = location.query.get("spread") ?? "2s10s";
   const ohlc = location.query.get("style") === "ohlc";
-  const approach: Approach = location.query.get("zoom") === "b" ? "b" : "a";
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
   const [instruments, setInstruments] = useState<InstrumentSummary[]>([]);
@@ -88,11 +87,11 @@ function SeriesPage({ location }: { location: Location }) {
   const spreadStats = useLoadStats();
   const slotsKey = slots.join(",");
   const yieldLoader = useMemo(
-    () => seriesLoader(approach, slotsKey.split(","), source, yields.record),
+    () => seriesLoader(slotsKey.split(","), source, yields.record),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [approach, slotsKey, source],
+    [slotsKey, source],
   );
-  // New tenors, source or approach: the counts start again (before the new chart's first answer arrives).
+  // New tenors or source: the counts start again (before the new chart's first answer arrives).
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => yields.reset(), [yieldLoader]);
 
@@ -100,9 +99,9 @@ function SeriesPage({ location }: { location: Location }) {
   const spreadDef = SPREADS.find((s) => s.key === spreadKey);
   const spreadEvents = useEvents(spreadDef ? [`spread(${spreadDef.long},${spreadDef.short})`] : [], () => []);
   const spreadLoad = useMemo(
-    () => (spreadDef ? spreadLoader(approach, spreadDef.long, spreadDef.short, spreadDef.key, spreadStats.record) : null),
+    () => (spreadDef ? spreadLoader(spreadDef.long, spreadDef.short, spreadDef.key, spreadStats.record) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [approach, spreadDef],
+    [spreadDef],
   );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => spreadStats.reset(), [spreadLoad]);
@@ -167,13 +166,6 @@ function SeriesPage({ location }: { location: Location }) {
             <option value="H15-TCM">Fed H.15 only</option>
           </select>
         </label>
-        <label>
-          Loading
-          <select value={approach} onChange={(e) => setQuery({ zoom: e.target.value === "b" ? "b" : null })}>
-            <option value="a">{APPROACH_LABEL.a}</option>
-            <option value="b">{APPROACH_LABEL.b}</option>
-          </select>
-        </label>
       </div>
 
       {error && <p className="error">Couldn't load: {error}</p>}
@@ -189,7 +181,7 @@ function SeriesPage({ location }: { location: Location }) {
         onInterval={yields.setShown}
         events={yieldEvents.marks}
       />
-      <LoadStats approach={approach} totals={yields.totals} interval={yields.interval} />
+      <LoadStats totals={yields.totals} interval={yields.interval} />
       <EventList events={yieldEvents.list} />
       <LatestTable rows={(latest ?? []).filter((r) => names.includes(r.name))} />
 
@@ -219,7 +211,7 @@ function SeriesPage({ location }: { location: Location }) {
             onInterval={spreadStats.setShown}
             events={spreadEvents.marks}
           />
-          <LoadStats approach={approach} totals={spreadStats.totals} interval={spreadStats.interval} />
+          <LoadStats totals={spreadStats.totals} interval={spreadStats.interval} />
           <EventList events={spreadEvents.list} />
         </>
       )}
@@ -304,6 +296,6 @@ export const seriesScreen: Screen = {
   id: "series",
   title: "Over time",
   path: "/series",
-  matches: (path) => path.startsWith("/series") || path.startsWith("/lab/zoom"),
+  matches: (path) => path.startsWith("/series"),
   Component: SeriesPage,
 };

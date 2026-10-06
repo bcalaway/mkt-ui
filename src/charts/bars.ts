@@ -1,8 +1,6 @@
 // Bars for a zooming chart: which interval suits how much time is on screen,
-// and (for the load-everything-once approach) daily values summed up into
-// bars in the browser. Summing up only picks values (first, last, highest,
-// lowest), compared exactly as decimal strings: no arithmetic.
-import { compareDecimal } from "../decimal";
+// and the date arithmetic the chart and its blocks need. The bars themselves
+// come from mkt-api.
 
 export type Interval = "day" | "week" | "month" | "quarter" | "year";
 
@@ -31,34 +29,4 @@ export function periodStart(day: string, interval: Interval): string {
   const m = d.getUTCMonth();
   const month = interval === "month" ? m : interval === "quarter" ? m - (m % 3) : 0;
   return `${y}-${String(month + 1).padStart(2, "0")}-01`;
-}
-
-export interface Bar {
-  date: string; // period start
-  last: string; // the close's day
-  open: string;
-  high: string;
-  low: string;
-  close: string;
-  source: string; // the close's
-}
-
-/** Daily (date, percent, source) in date order, summed up into bars. */
-export function toBars(dates: string[], percents: string[], sourceAt: (i: number) => string, interval: Interval): Bar[] {
-  const out: Bar[] = [];
-  for (let i = 0; i < dates.length; i++) {
-    const start = periodStart(dates[i], interval);
-    const v = percents[i];
-    const b = out[out.length - 1];
-    if (b && b.date === start) {
-      if (compareDecimal(v, b.high) > 0) b.high = v;
-      if (compareDecimal(v, b.low) < 0) b.low = v;
-      b.close = v;
-      b.last = dates[i];
-      b.source = sourceAt(i);
-    } else {
-      out.push({ date: start, last: dates[i], open: v, high: v, low: v, close: v, source: sourceAt(i) });
-    }
-  }
-  return out;
 }

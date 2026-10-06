@@ -30,9 +30,9 @@ afterAll(() => {
 
 describe("the /api proxy to mkt-api", () => {
   it("passes the path and query through", async () => {
-    const res = await request(app).get("/api/series?name=UST-2Y-CMT&name=UST-10Y-CMT&start=2026-01-01");
+    const res = await request(app).get("/api/bars?series=UST-2Y-CMT&series=UST-10Y-CMT&interval=day&block=2026");
     expect(res.status).toBe(200);
-    expect(res.body.url).toBe("/api/series?name=UST-2Y-CMT&name=UST-10Y-CMT&start=2026-01-01");
+    expect(res.body.url).toBe("/api/bars?series=UST-2Y-CMT&series=UST-10Y-CMT&interval=day&block=2026");
     expect(res.headers["server-timing"]).toMatch(/^api;dur=5\.0, upstream;dur=4\.0, proxy;dur=[\d.]+$/);
   });
 

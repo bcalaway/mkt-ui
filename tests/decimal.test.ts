@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bpChange } from "../src/decimal";
+import { bpChange, compareDecimal } from "../src/decimal";
 import { shortTenor, tenorLabel } from "../src/format";
 
 describe("bpChange", () => {
@@ -9,6 +9,13 @@ describe("bpChange", () => {
     expect(bpChange("4.10", "4.1")).toBe("0");
     expect(bpChange("4.125", "4.10")).toBe("+2.5");
     expect(bpChange("0.07", "0.1")).toBe("-3"); // floats would say -2.9999999999999996
+  });
+});
+
+describe("compareDecimal", () => {
+  it("compares exactly", () => {
+    expect(compareDecimal("4.10", "4.1")).toBe(0);
+    expect(compareDecimal("-0.5", "0.25")).toBe(-1);
   });
 });
 
