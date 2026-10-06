@@ -6,8 +6,8 @@ name: Lockfile
 # Docker) then needs the lockfile this writes. Dependabot's PRs already carry
 # their lockfile, so this finds nothing to do on them.
 #
-# A commit pushed with the workflow's token doesn't start other workflows,
-# so CI runs on the next push to the branch (or close and reopen the PR).
+# Runs started by that commit (the github-actions bot's) wait for approval
+# in this public repo, so CI's check comes from the next push to the branch.
 
 on:
   pull_request:
