@@ -70,7 +70,7 @@ export function createApp() {
 
   // The market data API: mkt-api (internal, mkt-api:8000) for the signed-in
   // user. Reads only, so GET only; the answer (or mkt-api's error) passes
-  // through as it is. Gated by the login check above like every other route.
+  // through as it is, including mkt-api's Swagger UI at /api/docs. Gated by the login check above like every other route.
   app.get("/api/{*path}", async (req, res) => {
     // Only the path and query come from the request; the host is always
     // mkt-api's, so a crafted path can't send this request anywhere else.
@@ -90,7 +90,8 @@ export function createApp() {
       // mkt-api says how long an answer keeps (a finished block of bars: a day).
       const cacheControl = upstream.headers.get("cache-control");
       if (cacheControl) res.set("Cache-Control", cacheControl);
-      res.status(upstream.status).type("application/json").send(body);
+      // mkt-api's own content type: JSON, or HTML for its Swagger UI at /api/docs.
+      res.status(upstream.status).type(upstream.headers.get("content-type") ?? "application/json").send(body);
     } catch (err) {
       res.status(502).json({ detail: `mkt-api didn't answer: ${err.message}` });
     }
