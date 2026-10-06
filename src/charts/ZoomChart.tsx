@@ -183,15 +183,14 @@ export default function ZoomChart({
       if (!logical || !current) return null;
       return { from: clamp(dateAt(logical.from)), to: clamp(dateAt(logical.to)) };
     };
-    // A window's bars at the interval that suits it, loaded for the window and
-    // as much again either side (room to pan).
+    // A window's bars at the interval that suits it. The loader decides how
+    // much more to load (whole blocks, or every day) and says what it covers.
     const showRange = (from: string, to: string) => {
       const { first, today } = props.current;
-      const span = Math.max(1, daysBetween(from, to));
-      const want = pickInterval(span);
+      const want = pickInterval(Math.max(1, daysBetween(from, to)));
       const keep: IRange<Time> = { from: from as Time, to: to as Time };
       if (want === "month") void load(want, first, today, keep);
-      else void load(want, clamp(addDays(from, -span)), clamp(addDays(to, span)), keep);
+      else void load(want, from, to, keep);
     };
 
     // On a zoom or pan: once it settles, reload if the window wants another
@@ -229,14 +228,10 @@ export default function ZoomChart({
       const { first, today } = props.current;
       void load(pickInterval(daysBetween(first, today)), first, today, null);
     };
-    // The last n days at the interval that suits them, loaded with as much again before (room to pan).
+    // The last n days at the interval that suits them.
     const showLast = (days: number) => {
       const { first, today } = props.current;
-      const from = addDays(today, -days) < first ? first : addDays(today, -days);
-      const want = pickInterval(daysBetween(from, today));
-      const keep: IRange<Time> = { from: from as Time, to: today as Time };
-      if (want === "month") void load(want, first, today, keep);
-      else void load(want, addDays(from, -days) < first ? first : addDays(from, -days), today, keep);
+      showRange(addDays(today, -days) < first ? first : addDays(today, -days), today);
     };
     const open = () => {
       const days = props.current.initialDays;

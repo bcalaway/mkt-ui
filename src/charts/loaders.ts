@@ -1,13 +1,14 @@
 // Where a zooming chart's bars come from. Two approaches, both kept for now
 // so we gain experience with each as the charts grow (Bill, 2026-10-06);
-// the agreed direction is A, made instant with cached blocks
-// (mkt-data's docs/phase-2.md, "Charts that grow").
-//   A: ask mkt-api for bars at each zoom level, for the window on screen.
+// the agreed direction is A (mkt-data's docs/phase-2.md, "Charts that grow").
+//   A: bars at the interval that suits the zoom, from mkt-api's /api/bars in
+//      fixed blocks, cached and fetched ahead (src/charts/blocks.ts).
 //   B: load every day once and make the bars in the browser.
 // Each loader reports every request it makes (bytes, and time split into
 // mkt-api's, quote-svc's and the network's, from Server-Timing).
-import { apiGet, serverTiming, type Ok } from "../api/client";
+import { apiGet, serverTiming, type BarSeries, type Ok } from "../api/client";
 import { toBars, type Interval } from "./bars";
+import { blockRange, blocksCovering, getBlock, prefetchAround, type BlockStat } from "./blocks";
 import type { TimeLine } from "./types";
 import type { Loader } from "./ZoomChart";
 import { SOURCE_LABEL, shortTenor } from "../format";
@@ -15,17 +16,11 @@ import { SOURCE_LABEL, shortTenor } from "../format";
 export type Approach = "a" | "b";
 
 export const APPROACH_LABEL: Record<Approach, string> = {
-  a: "Ask at each zoom",
+  a: "Cached blocks",
   b: "Load every day once",
 };
 
-export interface RequestStat {
-  interval: Interval;
-  bytes: number;
-  totalMs: number; // in the browser: request to parsed answer
-  apiMs?: number; // mkt-api's own time
-  upstreamMs?: number; // of which waiting on quote-svc and secmaster-svc
-}
+export type RequestStat = BlockStat;
 
 export type Recorder = (stat: RequestStat) => void;
 
@@ -53,29 +48,48 @@ function note(interval: Interval, open: string, high: string, low: string, last:
   return interval === "day" ? extra : `open ${open}, high ${high}, low ${low}; close on ${last}${extra ? ` (${extra})` : ""}`;
 }
 
+/**
+ * Series (`UST-10Y-CMT`, `spread(UST-10Y-CMT,UST-2Y-CMT)`) from /api/bars: the blocks covering the
+ * window, merged, with the blocks either side fetched ahead. What's loaded is whole blocks, so small
+ * pans need nothing new, and a pan or zoom past them usually finds the next block already here.
+ */
+function blockLoader(
+  exprs: string[],
+  source: string,
+  record: Recorder,
+  toLine: (s: BarSeries, k: number, interval: Interval) => TimeLine,
+  first: string,
+  today: string,
+): Loader {
+  return async (interval, from, to) => {
+    const ids = blocksCovering(interval, from < first ? first : from, to > today ? today : to);
+    const got = await Promise.all(ids.map((id) => getBlock(interval, id, source, exprs, record)));
+    prefetchAround(interval, ids, today, first, source, exprs, record);
+    const lines = exprs.map((_, k) => toLine({ ...got[0][k], bars: got.flatMap((b) => b[k].bars) }, k, interval));
+    return { lines, from: blockRange(interval, ids[0]).start, to: blockRange(interval, ids[ids.length - 1]).end };
+  };
+}
+
+export const FIRST_DAY = "1962-01-01";
+const today = () => new Date().toISOString().slice(0, 10);
+
 /** Yields for some tenors. Lines keep their slots from `slots` (a name's position; empty positions keep colors). */
 export function seriesLoader(approach: Approach, slots: string[], source: string, record: Recorder): Loader {
   const names = slots.filter(Boolean);
   const slotOf = (name: string) => Math.max(0, slots.indexOf(name));
   if (approach === "a") {
-    return async (interval, from, to) => {
-      const r = await timed(interval, record, (onResponse) =>
-        apiGet("/api/series", { query: { name: names, start: from, end: to, interval, source: source || undefined }, onResponse }),
-      );
-      const lines: TimeLine[] = r.series.map((s) => ({
-        key: s.name,
-        label: shortTenor(s.name),
-        slot: slotOf(s.name),
-        points: s.points.map((p) => ({
-          date: p.date,
-          plot: Number(p.percent),
-          bar: { open: Number(p.open_percent), high: Number(p.high_percent), low: Number(p.low_percent) },
-          text: `${p.percent}%`,
-          note: note(interval, p.open_percent, p.high_percent, p.low_percent, p.last_date, SOURCE_LABEL[p.source] ?? p.source),
-        })),
-      }));
-      return { lines, from: r.start, to: r.end };
-    };
+    return blockLoader(names, source, record, (s, k, interval) => ({
+      key: names[k],
+      label: shortTenor(names[k]),
+      slot: slotOf(names[k]),
+      points: s.bars.map((b) => ({
+        date: b.date,
+        plot: Number(b.close),
+        bar: { open: Number(b.open), high: Number(b.high), low: Number(b.low) },
+        text: `${b.close}%`,
+        note: note(interval, b.open, b.high, b.low, b.last_date, SOURCE_LABEL[b.source] ?? b.source),
+      })),
+    }), FIRST_DAY, today());
   }
   let daily: Promise<Ok<"/api/series/daily">> | null = null;
   // Every day is loaded once, so the bars cover whatever window is asked for.
@@ -111,26 +125,18 @@ export function seriesLoader(approach: Approach, slots: string[], source: string
 /** A spread in basis points, long minus short. */
 export function spreadLoader(approach: Approach, long: string, short: string, label: string, record: Recorder): Loader {
   if (approach === "a") {
-    return async (interval, from, to) => {
-      const r = await timed(interval, record, (onResponse) =>
-        apiGet("/api/spread", { query: { long, short, start: from, end: to, interval }, onResponse }),
-      );
-      const lines: TimeLine[] = [
-        {
-          key: r.name,
-          label,
-          slot: 0,
-          points: r.points.map((p) => ({
-            date: p.date,
-            plot: Number(p.bp),
-            bar: { open: Number(p.open_bp), high: Number(p.high_bp), low: Number(p.low_bp) },
-            text: `${p.bp} bp`,
-            note: note(interval, p.open_bp, p.high_bp, p.low_bp, p.last_date, interval === "day" ? `${p.long}% − ${p.short}%` : ""),
-          })),
-        },
-      ];
-      return { lines, from: r.start, to: r.end };
-    };
+    return blockLoader([`spread(${long},${short})`], "", record, (s, _k, interval) => ({
+      key: s.key,
+      label,
+      slot: 0,
+      points: s.bars.map((b) => ({
+        date: b.date,
+        plot: Number(b.close),
+        bar: { open: Number(b.open), high: Number(b.high), low: Number(b.low) },
+        text: `${b.close} bp`,
+        note: note(interval, b.open, b.high, b.low, b.last_date, interval === "day" ? `${b.inputs[0]}% − ${b.inputs[1]}%` : ""),
+      })),
+    }), FIRST_DAY, today());
   }
   let daily: Promise<Ok<"/api/spread/daily">> | null = null;
   return async (interval) => {
