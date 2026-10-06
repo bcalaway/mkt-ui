@@ -8,6 +8,10 @@ let app;
 
 beforeAll(async () => {
   fake = http.createServer((req, res) => {
+    if (req.url === "/api/docs") {
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      return res.end("<!doctype html><title>mkt-api - Swagger UI</title>");
+    }
     if (req.url.startsWith("/api/instruments/NOPE")) {
       res.writeHead(404, { "content-type": "application/json" });
       return res.end(JSON.stringify({ detail: "no instrument named 'NOPE'" }));
@@ -39,6 +43,12 @@ describe("the /api proxy to mkt-api", () => {
   it("passes mkt-api's Cache-Control through", async () => {
     const res = await request(app).get("/api/bars?series=UST-10Y-CMT&interval=month&block=1990");
     expect(res.headers["cache-control"]).toBe("private, max-age=86400");
+  });
+
+  it("passes mkt-api's content type through (its Swagger UI is HTML)", async () => {
+    const res = await request(app).get("/api/docs");
+    expect(res.headers["content-type"]).toMatch(/^text\/html/);
+    expect(res.text).toMatch(/Swagger UI/);
   });
 
   it("passes mkt-api's errors through", async () => {
