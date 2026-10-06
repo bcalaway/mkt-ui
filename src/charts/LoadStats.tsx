@@ -1,10 +1,9 @@
 // What a zooming chart has loaded and how long the last load took, split into
-// mkt-api's time, the time waiting on quote-svc, and the network: for
-// comparing the two loading approaches while both are in use.
+// mkt-api's time, the time waiting on quote-svc, and the network: to see the
+// block cache at work and where time goes.
 import { useCallback, useRef, useState } from "react";
 import type { Interval } from "./bars";
-import type { Approach, RequestStat } from "./loaders";
-import { APPROACH_LABEL } from "./loaders";
+import type { RequestStat } from "./loaders";
 
 const INTERVAL_LABEL: Record<Interval, string> = { day: "daily", week: "weekly", month: "monthly", quarter: "quarterly", year: "yearly" };
 
@@ -18,7 +17,7 @@ interface Totals {
 
 const EMPTY: Totals = { requests: 0, ahead: 0, cached: 0, bytes: 0, last: null };
 
-/** Totals of a chart's requests; `record` is stable, `reset` starts again (new tenors, new approach). */
+/** Totals of a chart's requests; `record` is stable, `reset` starts again (new tenors or source). */
 export function useLoadStats() {
   const ref = useRef<Totals>(EMPTY);
   const [totals, setTotals] = useState<Totals>(EMPTY);
@@ -44,18 +43,16 @@ export function useLoadStats() {
 }
 
 export default function LoadStats({
-  approach,
   totals,
   interval,
 }: {
-  approach: Approach;
   totals: Totals;
   interval: Interval | null;
 }) {
   const last = totals.last;
   return (
     <p className="muted load-stats" aria-live="polite">
-      {interval ? `${INTERVAL_LABEL[interval]} bars` : "Loading"}. {APPROACH_LABEL[approach]}: {totals.requests} request
+      {interval ? `${INTERVAL_LABEL[interval]} bars` : "Loading"}. {totals.requests} request
       {totals.requests === 1 ? "" : "s"}
       {totals.ahead > 0 && ` (${totals.ahead} ahead)`}, {(totals.bytes / 1024).toFixed(0)} KB
       {totals.cached > 0 && `, ${totals.cached} block load${totals.cached === 1 ? "" : "s"} from the cache`}
