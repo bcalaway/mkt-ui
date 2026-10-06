@@ -5,7 +5,7 @@
 // and retired (Bill, 2026-10-06). Each loader reports every request it makes
 // (bytes, and time split into mkt-api's, quote-svc's and the network's, from
 // Server-Timing).
-import type { BarSeries } from "../api/client";
+import type { Bar, BarSeries } from "../api/client";
 import type { Interval } from "./bars";
 import { blockRange, blocksCovering, getBlock, prefetchAround, type BlockStat } from "./blocks";
 import type { TimeLine } from "./types";
@@ -15,6 +15,32 @@ import { SOURCE_LABEL, shortTenor } from "../format";
 export type RequestStat = BlockStat;
 
 export type Recorder = (stat: RequestStat) => void;
+
+// mkt-api's values are decimals ("0.041"), each with a display form in the
+// series' unit ("4.10" percent, "52" bp) that's what the chart plots and shows
+// (mkt-api #11, 2026-10-06). Blocks the browser cached before then (kept up to
+// a day) have no display fields: their values were already in display units.
+// The fallback can go after 2026-10-08.
+type Field = "open" | "high" | "low" | "close";
+function shown(b: Bar, f: Field): string {
+  return (b[`${f}_display` as keyof Bar] as string | undefined) ?? b[f];
+}
+
+function shownInputs(b: Bar): string[] {
+  return (b.inputs_display as string[] | undefined) ?? b.inputs;
+}
+
+/** A bar in the chart's terms: drawn from the display forms, shown as given. */
+function point(b: Bar, unit: "%" | " bp", interval: Interval, extra: string) {
+  const [o, h, l, c] = (["open", "high", "low", "close"] as Field[]).map((f) => shown(b, f));
+  return {
+    date: b.date,
+    plot: Number(c),
+    bar: { open: Number(o), high: Number(h), low: Number(l) },
+    text: `${c}${unit}`,
+    note: note(interval, o, h, l, b.last_date, extra),
+  };
+}
 
 function note(interval: Interval, open: string, high: string, low: string, last: string, extra: string): string {
   return interval === "day" ? extra : `open ${open}, high ${high}, low ${low}; close on ${last}${extra ? ` (${extra})` : ""}`;
@@ -53,13 +79,7 @@ export function seriesLoader(slots: string[], source: string, record: Recorder):
     key: names[k],
     label: shortTenor(names[k]),
     slot: slotOf(names[k]),
-    points: s.bars.map((b) => ({
-      date: b.date,
-      plot: Number(b.close),
-      bar: { open: Number(b.open), high: Number(b.high), low: Number(b.low) },
-      text: `${b.close}%`,
-      note: note(interval, b.open, b.high, b.low, b.last_date, SOURCE_LABEL[b.source] ?? b.source),
-    })),
+    points: s.bars.map((b) => point(b, "%", interval, SOURCE_LABEL[b.source] ?? b.source)),
   }), FIRST_DAY, today());
 }
 
@@ -69,12 +89,6 @@ export function spreadLoader(long: string, short: string, label: string, record:
     key: s.key,
     label,
     slot: 0,
-    points: s.bars.map((b) => ({
-      date: b.date,
-      plot: Number(b.close),
-      bar: { open: Number(b.open), high: Number(b.high), low: Number(b.low) },
-      text: `${b.close} bp`,
-      note: note(interval, b.open, b.high, b.low, b.last_date, interval === "day" ? `${b.inputs[0]}% − ${b.inputs[1]}%` : ""),
-    })),
+    points: s.bars.map((b) => point(b, " bp", interval, interval === "day" ? `${shownInputs(b)[0]}% − ${shownInputs(b)[1]}%` : "")),
   }), FIRST_DAY, today());
 }

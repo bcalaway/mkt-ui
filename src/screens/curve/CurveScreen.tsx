@@ -47,7 +47,7 @@ function CurvePage({ location }: { location: Location }) {
       label: `${curveName(c)} (${c.date})`,
       short: i === 0 ? c.date! : c.label,
       slot: i,
-      values: Object.fromEntries(c.points.map((p) => [shortTenor(p.name), { text: p.percent, source: p.source }])),
+      values: Object.fromEntries(c.points.map((p) => [shortTenor(p.name), { text: p.display, source: p.source }])),
     }));
     return { curves, tenors, lines };
   }, [data]);
@@ -122,13 +122,13 @@ function CurveTable({ curves, tenors }: { curves: Curve[]; tenors: string[] }) {
           return (
             <tr key={t}>
               <th scope="row">{t}</th>
-              <td className="num">{now ? `${now.percent}%` : "–"}</td>
+              <td className="num">{now ? `${now.display}%` : "–"}</td>
               {others.map((c) => {
                 const then = at(c, t);
                 return (
                   <td key={c.label} className="num">
-                    {then ? `${then.percent}%` : "–"}
-                    {now && then && <span className="change"> {bpChange(now.percent, then.percent)}</span>}
+                    {then ? `${then.display}%` : "–"}
+                    {now && then && <span className="change"> {bpChange(now.display, then.display)}</span>}
                   </td>
                 );
               })}
