@@ -2,11 +2,12 @@
 // Both charts open on the last year and zoom from all of history (since 1962)
 // down to days; how they load is a setting while both approaches are tried.
 import { useEffect, useMemo, useState } from "react";
-import { apiGet, type InstrumentSummary } from "../../api/client";
+import { apiGet, type ChartEventOut, type InstrumentSummary } from "../../api/client";
 import type { Preset } from "../../charts/ChartToolbar";
 import LoadStats, { useLoadStats } from "../../charts/LoadStats";
 import { APPROACH_LABEL, seriesLoader, spreadLoader, type Approach } from "../../charts/loaders";
 import { MAX_SERIES } from "../../charts/theme";
+import type { ChartEvent } from "../../charts/types";
 import ZoomChart from "../../charts/ZoomChart";
 import { SOURCE_LABEL, shortTenor } from "../../format";
 import { useQueryUpdater, type Location } from "../../router";
@@ -26,6 +27,23 @@ const SPREADS: { key: string; long: string; short: string; label: string }[] = [
   { key: "3m10y", long: "UST-10Y-CMT", short: "UST-3M-CMT", label: "10-year minus 3-month" },
 ];
 const DEFAULT_NAMES = ["UST-2Y-CMT", "UST-10Y-CMT", "UST-30Y-CMT"];
+
+/** The events (security master notes) for a chart's series; [] until they arrive, or if they can't. */
+function useEvents(series: string[], lines: (e: ChartEventOut) => string[]): { marks: ChartEvent[]; list: ChartEventOut[] } {
+  const key = series.join("|");
+  const [list, setList] = useState<ChartEventOut[]>([]);
+  useEffect(() => {
+    if (!key) return setList([]);
+    const ctl = new AbortController();
+    apiGet("/api/events", { query: { series: key.split("|") }, signal: ctl.signal })
+      .then((r) => setList(r.events))
+      .catch(() => setList([])); // markers are extra: a chart without them is still right
+    return () => ctl.abort();
+  }, [key]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const marks = useMemo(() => list.map((e) => ({ date: e.date, title: e.title, text: e.text, lines: lines(e) })), [list]);
+  return { marks, list };
+}
 
 interface LatestRow {
   name: string;
@@ -78,7 +96,9 @@ function SeriesPage({ location }: { location: Location }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => yields.reset(), [yieldLoader]);
 
+  const yieldEvents = useEvents(names, (e) => e.series);
   const spreadDef = SPREADS.find((s) => s.key === spreadKey);
+  const spreadEvents = useEvents(spreadDef ? [`spread(${spreadDef.long},${spreadDef.short})`] : [], () => []);
   const spreadLoad = useMemo(
     () => (spreadDef ? spreadLoader(approach, spreadDef.long, spreadDef.short, spreadDef.key, spreadStats.record) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -109,7 +129,7 @@ function SeriesPage({ location }: { location: Location }) {
         <h1>Yields over time</h1>
         <p className="lede">
           Constant-maturity yields since 1962. Jump to a span with the buttons, or zoom with the scroll wheel or a pinch: months for decades, weeks for
-          years, days for months. Hover to see each value and which publisher it came from.
+          years, days for months. Hover to see each value and which publisher it came from; dots mark the security master's notes (first published, gaps, method changes), listed under the chart.
         </p>
       </header>
 
@@ -167,8 +187,10 @@ function SeriesPage({ location }: { location: Location }) {
         presets={PRESETS}
         initialDays={OPEN_ON_DAYS}
         onInterval={yields.setShown}
+        events={yieldEvents.marks}
       />
       <LoadStats approach={approach} totals={yields.totals} interval={yields.interval} />
+      <EventList events={yieldEvents.list} />
       <LatestTable rows={(latest ?? []).filter((r) => names.includes(r.name))} />
 
       <h2>Spread</h2>
@@ -195,8 +217,10 @@ function SeriesPage({ location }: { location: Location }) {
             presets={PRESETS}
             initialDays={OPEN_ON_DAYS}
             onInterval={spreadStats.setShown}
+            events={spreadEvents.marks}
           />
           <LoadStats approach={approach} totals={spreadStats.totals} interval={spreadStats.interval} />
+          <EventList events={spreadEvents.list} />
         </>
       )}
     </section>
@@ -215,6 +239,37 @@ function Legend({ slots }: { slots: string[] }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+function EventList({ events }: { events: ChartEventOut[] }) {
+  if (!events.length) return null;
+  return (
+    <details className="events">
+      <summary>
+        Marked on the chart ({events.length}): {events.map((e) => e.title).filter((t, i, all) => all.indexOf(t) === i).join(", ")}
+      </summary>
+      <table className="data">
+        <thead>
+          <tr>
+            <th scope="col">Date</th>
+            <th scope="col">Event</th>
+            <th scope="col">Tenors</th>
+            <th scope="col">Note</th>
+          </tr>
+        </thead>
+        <tbody>
+          {events.map((e) => (
+            <tr key={`${e.date}-${e.key}`}>
+              <td>{e.date}</td>
+              <th scope="row">{e.title}</th>
+              <td>{e.series.map(shortTenor).join(", ")}</td>
+              <td className="muted">{e.text}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </details>
   );
 }
 
