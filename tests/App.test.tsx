@@ -52,6 +52,33 @@ const ANSWERS: Record<string, unknown> = {
     ],
     years: [{ year: "2026", periods: 190, captures: 200, capture_bytes: 21000000 }],
   },
+  "/api/calendars": {
+    as_of: "2026-10-07",
+    calendars: [
+      { name: "SIFMA-US", description: "SIFMA US bond market", timezone: "America/New_York", first_year: 1990, last_year: 2100,
+        coverage: { published: 30, rules: 7, projected: 74, last_published_year: 2027 },
+        next_close: { date: "2026-10-12", status: "closed", holiday: "Columbus Day", close_time: "", projected: false },
+        next_early_close: { date: "2026-11-27", status: "early_close", holiday: "Day after Thanksgiving", close_time: "14:00", projected: false } },
+    ],
+  },
+  "/api/calendars/upcoming": {
+    start: "2026-10-07", end: "2027-04-05", calendars: ["FED", "SIFMA-US"],
+    days: [{ date: "2026-10-12", calendars: { "SIFMA-US": { date: "2026-10-12", status: "closed", holiday: "Columbus Day", close_time: "", projected: false } } }],
+  },
+  "/api/calendars/day": {
+    date: "2026-10-12", weekday: "Monday",
+    calendars: [
+      { calendar: "FED", covered: true, business_day: true, status: "open", holiday: "", close_time: "", projected: false },
+      { calendar: "SIFMA-US", covered: true, business_day: false, status: "closed", holiday: "Columbus Day", close_time: "", projected: false },
+    ],
+  },
+  "/api/calendars/SIFMA-US/2026": {
+    calendar: "SIFMA-US", timezone: "America/New_York", year: 2026, source: "SIFMA-US", kind: "published",
+    closes: [
+      { date: "2026-10-12", status: "closed", holiday: "Columbus Day", close_time: "", projected: false },
+      { date: "2026-11-27", status: "early_close", holiday: "Day after Thanksgiving", close_time: "14:00", projected: false },
+    ],
+  },
   "/api/curve": {
     curves: [
       { label: "latest", requested: "2026-10-03", date: "2026-10-02", missing: [],
@@ -141,5 +168,27 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "Periods by year" })).toBeInTheDocument();
     const asked = (fetch as unknown as { mock: { calls: [string][] } }).mock.calls.map(([u]) => u);
     expect(asked).toContain("/api/sources/TD-PRICES?checks=100");
+  });
+
+  it("lists calendars with coverage, a day lookup and upcoming closes side by side", async () => {
+    serve();
+    window.history.replaceState(null, "", "/calendars?date=2026-10-12");
+    render(<App />);
+    const link = await screen.findByRole("link", { name: "SIFMA-US" });
+    expect(link.getAttribute("href")).toBe("/calendars/SIFMA-US/2026");
+    expect(screen.getByText("30 · 7 · 74")).toBeInTheDocument();
+    expect(await screen.findByText("Monday")).toBeInTheDocument();
+    expect(screen.getByText("Business day")).toBeInTheDocument();
+    expect((await screen.findAllByText("Closed: Columbus Day")).length).toBeGreaterThan(0);
+  });
+
+  it("shows a calendar's year as month grids with its closes", async () => {
+    serve();
+    window.history.replaceState(null, "", "/calendars/sifma-us/2026");
+    render(<App />);
+    expect(await screen.findByText("Published, from SIFMA-US", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText("October")).toBeInTheDocument();
+    expect(screen.getByTitle("Early close 14:00: Day after Thanksgiving")).toHaveClass("early");
+    expect(screen.getByRole("link", { name: "2027 →" }).getAttribute("href")).toBe("/calendars/SIFMA-US/2027");
   });
 });
