@@ -60,6 +60,13 @@ const NO_EVENTS: ChartEvent[] = [];
 // across. Long enough for any market close (the longest, after 9/11, was 6 days).
 const GAP_DAYS: Record<Interval, number> = { day: 10, week: 21, month: 70, quarter: 190, year: 400 };
 
+/** An axis label in the chart's unit: "4.10%" for a yield, "52" bp, "99.875" for a price per 100. */
+function axisLabel(v: number, unit: string): string {
+  if (unit === "bp") return v.toFixed(0);
+  if (unit === "price") return v.toFixed(3);
+  return `${v.toFixed(2)}%`;
+}
+
 export default function ZoomChart({
   loader,
   first,
@@ -113,7 +120,7 @@ export default function ZoomChart({
         grid: { vertLines: { visible: false }, horzLines: { color: theme.grid } },
         rightPriceScale: { borderColor: theme.axis },
         timeScale: { borderColor: theme.axis, minBarSpacing: 0.05 },
-        localization: { priceFormatter: (v: number) => `${v.toFixed(unit === "bp" ? 0 : 2)}${unit === "bp" ? "" : "%"}` },
+        localization: { priceFormatter: (v: number) => axisLabel(v, unit) },
       };
     };
     const chart: IChartApi = createChart(box.current, { height, autoSize: true, crosshair: { mode: CrosshairMode.Magnet }, ...style() });

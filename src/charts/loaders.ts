@@ -31,7 +31,7 @@ function shownInputs(b: Bar): string[] {
 }
 
 /** A bar in the chart's terms: drawn from the display forms, shown as given. */
-function point(b: Bar, unit: "%" | " bp", interval: Interval, extra: string) {
+function point(b: Bar, unit: "%" | " bp" | "", interval: Interval, extra: string) {
   const [o, h, l, c] = (["open", "high", "low", "close"] as Field[]).map((f) => shown(b, f));
   return {
     date: b.date,
@@ -91,4 +91,16 @@ export function spreadLoader(long: string, short: string, label: string, record:
     slot: 0,
     points: s.bars.map((b) => point(b, " bp", interval, interval === "day" ? `${shownInputs(b)[0]}% − ${shownInputs(b)[1]}%` : "")),
   }), FIRST_DAY, today());
+}
+
+export const PRICES_FIRST_DAY = "2008-01-01";
+
+/** A Treasury security's FedInvest end-of-day price per 100 (mkt-api charts a security's price), from 2008. */
+export function priceLoader(name: string, record: Recorder): Loader {
+  return blockLoader([name], "", record, (s, _k, interval) => ({
+    key: name,
+    label: name,
+    slot: 0,
+    points: s.bars.map((b) => point(b, "", interval, "FedInvest end of day")),
+  }), PRICES_FIRST_DAY, today());
 }
