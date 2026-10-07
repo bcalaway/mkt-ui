@@ -55,5 +55,8 @@ describe("App", () => {
     const link = await screen.findByRole("link", { name: "UST-1.5M-CMT" });
     expect(link.getAttribute("href")).toBe("/instruments/UST-1.5M-CMT");
     expect(screen.getByText("UST-6W-CMT")).toBeInTheDocument();
+    // Only the curve's tenors: thousands of Treasury securities are found by search instead.
+    const asked = (fetch as unknown as { mock: { calls: [string][] } }).mock.calls.map(([u]) => u);
+    expect(asked).toContain("/api/instruments?type=cmt_yield");
   });
 });

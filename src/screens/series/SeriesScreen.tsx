@@ -67,7 +67,8 @@ function SeriesPage({ location }: { location: Location }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiGet("/api/instruments").then(setInstruments).catch((e: Error) => setError(e.message));
+    // Only the curve's tenors: the thousands of Treasury securities aren't yields over time.
+    apiGet("/api/instruments", { query: { type: "cmt_yield" } }).then(setInstruments).catch((e: Error) => setError(e.message));
   }, []);
 
   // The latest value of each tenor shown, from today's curve: a table beside the chart.
