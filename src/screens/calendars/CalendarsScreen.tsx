@@ -14,6 +14,9 @@ type Calendars = Schemas["CalendarsResponse"];
 type Upcoming = Schemas["UpcomingResponse"];
 type DayLookup = Schemas["DayLookupResponse"];
 type Year = Schemas["CalendarYearOut"];
+type SourcesOut = Schemas["CalendarSourcesResponse"];
+type History = Schemas["DayHistoryResponse"];
+type Disagreements = Schemas["DisagreementsResponse"];
 
 const KIND_LABEL: Record<string, string> = { published: "Published", rules: "Rules file", projected: "Projected" };
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
@@ -215,7 +218,7 @@ function Month({ year, month, closes }: { year: number; month: number; closes: M
               const cls = [i === 0 || i === 6 ? "weekend" : "", c ? (c.status === "early_close" ? "early" : "closed") : "",
                 c?.projected ? "projected" : ""].filter(Boolean).join(" ");
               return (
-                <td key={i} className={cls || undefined} title={c ? closeText(c) : undefined}>
+                <td key={i} className={cls || undefined} title={c ? `${closeText(c)}${c.source ? `, from ${c.source}` : ""}` : undefined}>
                   {day}
                 </td>
               );
@@ -227,7 +230,166 @@ function Month({ year, month, closes }: { year: number; month: number; closes: M
   );
 }
 
-function YearPage({ name, year }: { name: string; year: number }) {
+const DIFFERS_LABEL: Record<string, string> = { status: "Status", time: "Close time", name: "Holiday name" };
+
+function SourcesPanel({ name }: { name: string }) {
+  const { data, error } = useApi<SourcesOut>((signal) => apiGet("/api/calendars/{name}/sources", { path: { name }, signal }), [name]);
+  return (
+    <section>
+      <h2>Sources, in precedence order</h2>
+      <p className="muted">A higher source decides a date it lists; a projection fills only years no other source covers.</p>
+      {error && <p className="error">{error}</p>}
+      {data && (
+        <table className="data">
+          <thead>
+            <tr>
+              <th scope="col" className="num">#</th>
+              <th scope="col">Source</th>
+              <th scope="col">Kind</th>
+              <th scope="col">Years it decided</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.sources.map((s) => (
+              <tr key={s.name}>
+                <td className="num">{s.rank}</td>
+                <td>
+                  <a {...linkProps(`/sources/${s.name}`)}>{s.name}</a>
+                </td>
+                <td>{KIND_LABEL[s.kind] ?? s.kind}</td>
+                <td className={s.years ? undefined : "muted"}>
+                  {s.years ? `${s.years} (${s.first_year === s.last_year ? s.first_year : `${s.first_year} to ${s.last_year}`})` : "None"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
+  );
+}
+
+function DayHistoryPanel({ name, day }: { name: string; day: string }) {
+  const setQuery = useQueryUpdater();
+  const { data, error } = useApi<History>(
+    (signal) => apiGet("/api/calendars/{name}/days/{day}", { path: { name, day }, signal }),
+    [name, day],
+  );
+  return (
+    <section className="day-history">
+      <h2>
+        {shortDate(day)} on {name}{" "}
+        <button type="button" className="chip" onClick={() => setQuery({ day: null })}>
+          Close
+        </button>
+      </h2>
+      {error && <p className="error">{error}</p>}
+      {data && data.versions.length === 0 && <p className="muted">Always a business day here (or a weekend): no source has closed it.</p>}
+      {data && data.versions.length > 0 && (
+        <table className="data">
+          <thead>
+            <tr>
+              <th scope="col">From</th>
+              <th scope="col">Until</th>
+              <th scope="col">Said</th>
+              <th scope="col">Source</th>
+              <th scope="col" className="num">Capture</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.versions.map((v, i) => (
+              <tr key={i}>
+                <td className="muted">{v.valid_from.slice(0, 10)}</td>
+                <td className={v.valid_to ? "muted" : undefined}>{v.valid_to ? v.valid_to.slice(0, 10) : "Now"}</td>
+                <td>{closeText({ date: day, status: v.status, holiday: v.holiday, close_time: v.close_time, projected: false, source: v.source })}</td>
+                <td>{v.source}</td>
+                <td className="num">#{v.capture_id}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
+  );
+}
+
+function DisagreementsPanel({ name, year }: { name: string; year: number }) {
+  const [asked, setAsked] = useState(false);
+  const [all, setAll] = useState(false);
+  const { data, error } = useApi<Disagreements | null>(
+    (signal) => (asked ? apiGet("/api/calendars/{name}/disagreements", { path: { name }, signal }) : Promise.resolve(null)),
+    [name, asked],
+  );
+  const rows = data ? data.days.filter((d) => all || d.date.startsWith(String(year))) : [];
+  const flagged = data ? data.days.filter((d) => !d.decided_by_higher).length : 0;
+  return (
+    <section>
+      <h2>Where the sources disagree</h2>
+      {!asked && (
+        <p>
+          <button type="button" className="chip" onClick={() => setAsked(true)}>
+            Check every year
+          </button>{" "}
+          <span className="muted">Reads each source's own dates from mkt-data: a few seconds.</span>
+        </p>
+      )}
+      {asked && !data && !error && <p className="muted">Checking…</p>}
+      {error && <p className="error">{error}</p>}
+      {data && (
+        <>
+          <p className={flagged ? "error" : "muted"}>
+            {data.days.length} days across every year where a source says something other than the calendar
+            {flagged ? `; ${flagged} decided by a lower source than one covering the year, worth a look` : ""}.{" "}
+            <label>
+              <input type="checkbox" checked={all} onChange={(e) => setAll(e.target.checked)} /> Every year
+            </label>
+          </p>
+          {rows.length === 0 ? (
+            <p className="muted">None {all ? "" : `in ${year}`}.</p>
+          ) : (
+            <table className="data">
+              <thead>
+                <tr>
+                  <th scope="col">Date</th>
+                  <th scope="col">Differs in</th>
+                  <th scope="col">The calendar</th>
+                  <th scope="col">Decided by</th>
+                  <th scope="col">Disagrees</th>
+                  <th scope="col">It says</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((d) => (
+                  <tr key={`${d.date}:${d.source}`}>
+                    <td>
+                      <a {...linkProps(`${PREFIX}/${name}/${d.date.slice(0, 4)}?day=${d.date}`)}>{shortDate(d.date)}</a>
+                    </td>
+                    <td>{DIFFERS_LABEL[d.differs] ?? d.differs}</td>
+                    <td>
+                      {d.calendar_says}
+                      {d.calendar_holiday && <span className="muted"> · {d.calendar_holiday}</span>}
+                    </td>
+                    <td>
+                      {d.decided_by || <span className="muted">—</span>}
+                      {!d.decided_by_higher && d.decided_by && <span className="badge status-error">lower source</span>}
+                    </td>
+                    <td>{d.source}</td>
+                    <td>
+                      {d.source_says}
+                      {d.source_holiday && <span className="muted"> · {d.source_holiday}</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+function YearPage({ name, year, day }: { name: string; year: number; day: string }) {
   const { data, error } = useApi<Year>(
     (signal) => apiGet("/api/calendars/{name}/{year}", { path: { name, year }, signal }),
     [name, year],
@@ -264,19 +426,34 @@ function YearPage({ name, year }: { name: string; year: number }) {
               <Month key={m} year={year} month={m} closes={closes} />
             ))}
           </div>
+          {day && <DayHistoryPanel name={name} day={day} />}
           <h2>Closes and early closes</h2>
           <table className="data">
+            <thead>
+              <tr>
+                <th scope="col">Date</th>
+                <th scope="col">Closes</th>
+                <th scope="col">Decided by</th>
+              </tr>
+            </thead>
             <tbody>
               {data.closes.map((c) => (
                 <tr key={c.date}>
-                  <td>{shortDate(c.date)}</td>
+                  <td>
+                    <a {...linkProps(`${PREFIX}/${name}/${year}?day=${c.date}`)} title="How this day's status changed">
+                      {shortDate(c.date)}
+                    </a>
+                  </td>
                   <td>{closeText(c)}</td>
+                  <td className="muted">{c.source}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </>
       )}
+      <SourcesPanel name={name} />
+      <DisagreementsPanel name={name} year={year} />
     </section>
   );
 }
@@ -285,7 +462,13 @@ function CalendarsScreen({ location }: { location: Location }) {
   const [name, year] = location.path.slice(PREFIX.length).replace(/^\/+/, "").split("/");
   if (name) {
     const y = Number(year);
-    return <YearPage name={decodeURIComponent(name).toUpperCase()} year={Number.isInteger(y) && y > 1800 ? y : new Date().getFullYear()} />;
+    return (
+      <YearPage
+        name={decodeURIComponent(name).toUpperCase()}
+        year={Number.isInteger(y) && y > 1800 ? y : new Date().getFullYear()}
+        day={location.query.get("day") ?? ""}
+      />
+    );
   }
   return <ListPage on={location.query.get("date") ?? ""} />;
 }
