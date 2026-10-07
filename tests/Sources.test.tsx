@@ -75,7 +75,7 @@ describe("Sources", () => {
     expect(screen.getByText("1 to 2 of 3,020")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Next 200" })).toBeInTheDocument();
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "912828" } });
-    fireEvent.submit(screen.getByRole("searchbox").closest("form")!);
+    fireEvent.submit(screen.getByRole("searchbox").closest("form") as HTMLFormElement);
     expect(window.location.search).toBe("?q=912828");
     await screen.findByText("Prices For: October 1, 2026");
     expect(asked()).toContain("/api/captures/8099/text?contains=912828&context=2&offset=0&limit=200");
