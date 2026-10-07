@@ -2,11 +2,17 @@
 // see its identifiers in each source, its notes and its latest value. By
 // type: the curve's CMT tenors (`type=cmt`, the default) or the Treasury
 // securities (`type=ust`, or one kind: bill, note, bond, tips, frn), whose
-// list and pages are in ./Treasuries.tsx.
-import { useEffect, useState } from "react";
+// list and pages are in ./Treasuries.tsx. A CMT's page charts its yield
+// with the same controls as Over time.
+import { useEffect, useMemo, useState } from "react";
 import { ApiError, apiGet, type InstrumentDetail, type InstrumentSummary } from "../../api/client";
+import LoadStats, { useLoadStats } from "../../charts/LoadStats";
+import { FIRST_DAY, seriesLoader } from "../../charts/loaders";
+import { OPEN_ON_DAYS, PRESETS } from "../../charts/presets";
+import StyleChips, { isOhlc } from "../../charts/StyleChips";
+import ZoomChart from "../../charts/ZoomChart";
 import { SOURCE_LABEL, tenorLabel } from "../../format";
-import { linkProps, useQueryUpdater, type Location } from "../../router";
+import { linkProps, useLocation, useQueryUpdater, type Location } from "../../router";
 import type { Screen } from "../types";
 import { TreasuryDetail, TreasuryList } from "./Treasuries";
 
@@ -130,6 +136,34 @@ function ListPage({ query, type, all }: { query: string; type: string; all: bool
   );
 }
 
+/** A yield's history (golden values, since 1962), zoomable, as lines or OHLC bars. */
+function YieldHistory({ name }: { name: string }) {
+  const stats = useLoadStats();
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const ohlc = isOhlc(useLocation());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const loader = useMemo(() => seriesLoader([name], "", stats.record), [name]);
+  return (
+    <>
+      <h2>Yield</h2>
+      <div className="controls" role="group" aria-label="Display">
+        <StyleChips ohlc={ohlc} />
+      </div>
+      <ZoomChart
+        loader={loader}
+        first={FIRST_DAY}
+        today={today}
+        unit="%"
+        bars={ohlc}
+        presets={PRESETS}
+        initialDays={OPEN_ON_DAYS}
+        onInterval={stats.setShown}
+      />
+      <LoadStats totals={stats.totals} interval={stats.interval} />
+    </>
+  );
+}
+
 function DetailPage({ name }: { name: string }) {
   // A Treasury security has its own page (price, terms, auctions); a CMT or anything else, this one.
   // The list links them alike, so it's decided by the instrument's type once it arrives.
@@ -176,6 +210,9 @@ function DetailPage({ name }: { name: string }) {
               </span>
             </p>
           )}
+          {inst.type === "cmt_yield" && <YieldHistory name={inst.name} />}
+
+          <h2>About</h2>
           <dl className="facts">
             <dt>Tenor</dt>
             <dd>{tenorLabel(inst.tenor)}</dd>
