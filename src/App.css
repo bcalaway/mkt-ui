@@ -158,6 +158,9 @@ code { font-size: 0.875rem; }
 .facts .fact { display: contents; } /* a dt/dd pair with a title (where the term came from) */
 .badge { display: inline-block; padding: 0 0.4rem; margin-right: 0.25rem; border-radius: 999px; font-size: 0.8125rem;
   background: var(--rule); color: var(--ink); white-space: nowrap; }
+/* A source's status on the Sources screen: only an error stands out. */
+.badge.status-error { background: var(--error); color: var(--accent-ink); }
+.badge.status-never, .badge.status-raw { background: transparent; color: var(--muted); border: 1px solid var(--rule); }
 
 .notes { list-style: none; padding: 0; margin: 0; max-width: 72ch; }
 .notes li { display: grid; grid-template-columns: 7rem 1fr; gap: 1rem; padding: 0.6rem 0; border-bottom: 1px solid var(--rule); }
