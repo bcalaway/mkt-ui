@@ -7,12 +7,14 @@
 // mkt_data_checks, readable without either.
 import { useEffect, useState } from "react";
 import { ApiError, apiGet, type Schemas } from "../../api/client";
-import { linkProps, type Location } from "../../router";
+import { linkProps, useQueryUpdater, type Location } from "../../router";
 import type { Screen } from "../types";
 
 const PREFIX = "/sources";
 type Source = Schemas["SourceOut"];
 type Detail = Schemas["SourceDetailOut"];
+type Text = Schemas["CaptureTextOut"];
+const TEXT_PAGE = 200;
 
 const GROUPS: { key: string; title: string; note: string }[] = [
   { key: "securities", title: "Treasury securities", note: "Auctions, prices, STRIPS and CPI: a page a day, month or year." },
@@ -20,7 +22,9 @@ const GROUPS: { key: string; title: string; note: string }[] = [
   { key: "calendars", title: "Calendars", note: "Holiday and early-close pages, and the rules files." },
 ];
 
-const STATUS_LABEL: Record<string, string> = { ok: "OK", error: "Error", never: "Not captured yet", raw: "Kept raw" };
+const STATUS_LABEL: Record<string, string> = {
+  ok: "OK", error: "Error", never: "Not captured yet", raw: "Kept raw", late: "Late",
+};
 const PERIOD_LABEL: Record<string, string> = { day: "By day", month: "By month", year: "By year" };
 
 /** "3 h ago", "2 days ago": how long before now an ISO timestamp was; "" for none. */
@@ -72,6 +76,7 @@ function ListPage() {
   }, []);
 
   const failing = rows?.filter((s) => s.status === "error") ?? [];
+  const late = rows?.filter((s) => s.status === "late") ?? [];
   return (
     <section>
       <header className="screen-head">
@@ -88,6 +93,7 @@ function ListPage() {
           <p className={failing.length ? "error" : "muted"}>
             {rows.length} sources;{" "}
             {failing.length ? `the last check failed for ${failing.map((s) => s.name).join(", ")}.` : "every last check worked."}
+            {late.length > 0 && ` Late against their schedule: ${late.map((s) => s.name).join(", ")}.`}
           </p>
           {GROUPS.map((g) => {
             const group = rows.filter((s) => s.group === g.key);
@@ -116,10 +122,10 @@ function ListPage() {
                           {s.kind !== "published" && <span className="muted"> · {s.kind}</span>}
                         </td>
                         <td className="muted">{s.calendar}</td>
-                        <td title={s.last_error}>
+                        <td title={s.last_error || (s.late ? `No successful fetch in over ${s.late_after_hours} hours` : undefined)}>
                           <StatusBadge s={s} />
                         </td>
-                        <td title={when(s.last_success_at)}>{ago(s.last_success_at) || <span className="muted">—</span>}</td>
+                        <td title={`${when(s.last_success_at)}; ${s.schedule}`}>{ago(s.last_success_at) || <span className="muted">—</span>}</td>
                         <td className={`num${s.errors_7d ? " error" : ""}`}>
                           {s.errors_7d} of {s.checks_7d}
                         </td>
@@ -174,6 +180,7 @@ function DetailPage({ name }: { name: string }) {
             </p>
             {s.last_error && <p className="error">Last check: {s.last_error}</p>}
           </header>
+          {s.pulls && <p className="lede">{s.pulls}</p>}
           <dl className="facts">
             <dt>Captured for</dt>
             <dd>
@@ -185,6 +192,10 @@ function DetailPage({ name }: { name: string }) {
             <dd className="muted">{s.url}</dd>
             <dt>Parser</dt>
             <dd>{s.parsed ? "Yes" : "Not yet: kept raw"}</dd>
+            <dt>Schedule</dt>
+            <dd>
+              {s.schedule} <span className="muted">({s.dag}; late after {s.late_after_hours} hours without a successful fetch)</span>
+            </dd>
             <dt>Last fetch that worked</dt>
             <dd>{s.last_success_at ? `${when(s.last_success_at)} (${ago(s.last_success_at)})` : "Never"}</dd>
             <dt>Last check</dt>
@@ -256,7 +267,9 @@ function DetailPage({ name }: { name: string }) {
                     {s.period_kind ? <td>{c.period}</td> : null}
                     <td className={c.outcome === "error" ? "error" : undefined}>{c.outcome}</td>
                     <td className={c.parse_outcome === "error" ? "error" : "muted"}>{c.parse_outcome || "—"}</td>
-                    <td className="num">{c.capture_id ? `#${c.capture_id}` : ""}</td>
+                    <td className="num">
+                      {c.capture_id ? <a {...linkProps(`${PREFIX}/${s.name}/captures/${c.capture_id}`)}>#{c.capture_id}</a> : ""}
+                    </td>
                     <td className="muted">{c.detail || c.parse_detail}</td>
                   </tr>
                 ))}
@@ -269,9 +282,105 @@ function DetailPage({ name }: { name: string }) {
   );
 }
 
+/** A raw capture's text as mkt-data's parsers read it (never the publisher's page), searchable, a page at a time. */
+function CapturePage({ name, id, q, offset }: { name: string; id: number; q: string; offset: number }) {
+  const setQuery = useQueryUpdater();
+  const [d, setD] = useState<Text | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [text, setText] = useState(q);
+
+  useEffect(() => {
+    const ctl = new AbortController();
+    setError(null);
+    apiGet("/api/captures/{capture_id}/text", {
+      path: { capture_id: id },
+      query: { contains: q || undefined, context: q ? 2 : undefined, offset, limit: TEXT_PAGE },
+      signal: ctl.signal,
+    })
+      .then(setD)
+      .catch((e: Error) => {
+        if (e.name === "AbortError") return;
+        setError(e instanceof ApiError && e.status === 404 ? `There's no capture #${id}.` : e.message);
+      });
+    return () => ctl.abort();
+  }, [id, q, offset]);
+
+  return (
+    <section>
+      <p>
+        <a {...linkProps(`${PREFIX}/${name}`)}>{name}</a>
+      </p>
+      <header className="screen-head">
+        <h1>Capture #{id}</h1>
+        {d && (
+          <p className="lede">
+            {d.source}
+            {d.period && `, ${d.period}`}, fetched {when(d.fetched_at)}: {d.lines_total.toLocaleString()} lines of{" "}
+            {d.view === "visible" ? "the page's visible text" : d.view === "json" ? "JSON" : "text"}, as the parser reads it.
+          </p>
+        )}
+      </header>
+      <form
+        className="controls"
+        onSubmit={(e) => {
+          e.preventDefault();
+          setQuery({ q: text || null, offset: null });
+        }}
+      >
+        <label>
+          Find
+          <input type="search" value={text} onChange={(e) => setText(e.target.value)} placeholder="a CUSIP, a date, a word" />
+        </label>
+        {q && d && <span className="muted">{d.matches ?? 0} lines match</span>}
+      </form>
+      {error && <p className="error">{error}</p>}
+      {!error && !d && <p className="muted">Loading…</p>}
+      {d && (
+        <>
+          <table className="data capture-text">
+            <tbody>
+              {d.lines.map((l) => (
+                <tr key={l.n}>
+                  <td className="num muted">{l.n}</td>
+                  <td>{l.text}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="controls">
+            {offset > 0 && (
+              <button type="button" className="chip" onClick={() => setQuery({ offset: offset > TEXT_PAGE ? String(offset - TEXT_PAGE) : null })}>
+                Previous {TEXT_PAGE}
+              </button>
+            )}
+            <span className="muted">
+              {d.shown_of ? `${offset + 1} to ${Math.min(offset + d.lines.length, d.shown_of)} of ${d.shown_of.toLocaleString()}` : "Nothing to show"}
+            </span>
+            {offset + d.lines.length < d.shown_of && (
+              <button type="button" className="chip" onClick={() => setQuery({ offset: String(offset + TEXT_PAGE) })}>
+                Next {TEXT_PAGE}
+              </button>
+            )}
+          </p>
+        </>
+      )}
+    </section>
+  );
+}
+
 function SourcesScreen({ location }: { location: Location }) {
-  const rest = location.path.slice(PREFIX.length).replace(/^\/+/, "");
-  return rest ? <DetailPage name={decodeURIComponent(rest)} /> : <ListPage />;
+  const [name, sub, id] = location.path.slice(PREFIX.length).replace(/^\/+/, "").split("/");
+  if (name && sub === "captures" && Number(id) > 0) {
+    return (
+      <CapturePage
+        name={decodeURIComponent(name)}
+        id={Number(id)}
+        q={location.query.get("q") ?? ""}
+        offset={Math.max(0, Number(location.query.get("offset") ?? 0) || 0)}
+      />
+    );
+  }
+  return name ? <DetailPage name={decodeURIComponent(name)} /> : <ListPage />;
 }
 
 export const sourcesScreen: Screen = {
