@@ -25,7 +25,7 @@ function ListPage({ query }: { query: string }) {
     setError(null);
     const req = query
       ? apiGet("/api/search", { query: { q: query, limit: 50 }, signal: ctl.signal })
-      : apiGet("/api/instruments", { signal: ctl.signal });
+      : apiGet("/api/instruments", { query: { type: "cmt_yield" }, signal: ctl.signal });
     req.then(setRows).catch((e: Error) => e.name !== "AbortError" && setError(e.message));
     return () => ctl.abort();
   }, [query]);
@@ -34,7 +34,10 @@ function ListPage({ query }: { query: string }) {
     <section>
       <header className="screen-head">
         <h1>Instruments</h1>
-        <p className="lede">Every instrument the platform knows, with the name each source uses for it.</p>
+        <p className="lede">
+          The curve's tenors, with the name each source uses for each. Thousands of Treasury securities are in the security master too: find one by
+          short name, CUSIP or an on-the-run alias like UST-10Y-OTR.
+        </p>
       </header>
       <form
         className="controls"
@@ -46,12 +49,12 @@ function ListPage({ query }: { query: string }) {
       >
         <label>
           Find
-          <input type="search" value={text} placeholder="UST-10Y-CMT, 6W, BC_10YEAR, DGS10" onChange={(e) => setText(e.target.value)} />
+          <input type="search" value={text} placeholder="UST-10Y-CMT, 6W, BC_10YEAR, UST-10Y-OTR, 91282CQC8" onChange={(e) => setText(e.target.value)} />
         </label>
         <button type="submit">Search</button>
         {query && (
           <button type="button" className="quiet" onClick={() => { setText(""); setQuery({ q: null }); }}>
-            Show all
+            Show the tenors
           </button>
         )}
       </form>
