@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import { ApiError, apiGet, type InstrumentDetail, type InstrumentSummary } from "../../api/client";
 import { SOURCE_LABEL, tenorLabel } from "../../format";
-import { linkProps, navigate, useQueryUpdater, type Location } from "../../router";
+import { linkProps, useQueryUpdater, type Location } from "../../router";
 import type { Screen } from "../types";
 import { TreasuryDetail, TreasuryList } from "./Treasuries";
 
@@ -228,17 +228,25 @@ function DetailPage({ name }: { name: string }) {
   );
 }
 
-function SecuritiesPage({ location }: { location: Location }) {
-  // The old Treasuries screen's links: /treasuries?type=note -> /instruments?type=note, /treasuries/X -> /instruments/X.
-  const old = location.path === OLD_TREASURIES || location.path.startsWith(`${OLD_TREASURIES}/`);
+/** The old Treasuries screen's links (/treasuries?type=note, /treasuries/X) as Instruments ones; others as they are. */
+function fromOldTreasuries(location: Location): Location {
+  if (location.path !== OLD_TREASURIES && !location.path.startsWith(`${OLD_TREASURIES}/`)) return location;
+  const query = new URLSearchParams(location.query);
+  if (!query.get("type")) query.set("type", "ust");
+  return { path: PREFIX + location.path.slice(OLD_TREASURIES.length), query };
+}
+
+function SecuritiesPage({ location: asked }: { location: Location }) {
+  const location = fromOldTreasuries(asked);
+  const moved = location !== asked;
   useEffect(() => {
-    if (!old) return;
-    const q = new URLSearchParams(location.query);
-    if (!q.get("type")) q.set("type", "ust");
-    const rest = location.path.slice(OLD_TREASURIES.length);
-    navigate(rest ? `${PREFIX}${rest}` : `${PREFIX}?${q.toString()}`, { replace: true });
-  }, [old, location]);
-  if (old) return null;
+    // Show the new address too, without a history entry. (Rendered from the rewritten location above, so
+    // nothing waits on the navigation event, which can fire before the app has started listening.)
+    if (moved) {
+      const s = location.query.toString();
+      window.history.replaceState(null, "", location.path === PREFIX && s ? `${PREFIX}?${s}` : location.path);
+    }
+  }, [moved, location]);
   const rest = location.path.slice(PREFIX.length).replace(/^\//, "");
   if (rest) return <DetailPage name={decodeURIComponent(rest)} />;
   return (
