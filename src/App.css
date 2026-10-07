@@ -211,3 +211,16 @@ button.tool:hover { color: var(--ink); border-color: var(--ink-2); }
 .events summary { cursor: pointer; color: var(--ink-2); }
 .events table.data { margin-top: 0.5rem; }
 .events td.muted { max-width: 48rem; }
+
+/* A calendar's year (Calendars screen): twelve small month grids. Closed days in the ink's weight, early closes
+   outlined, weekends muted, projected days dashed. */
+.months { display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); gap: 1.25rem 1.5rem; margin: 0.5rem 0 1.5rem; }
+.month { border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 0.875rem; width: 100%; }
+.month caption { text-align: left; font-weight: 600; padding-bottom: 0.25rem; }
+.month th { color: var(--muted); font-weight: 400; font-size: 0.75rem; }
+.month td { text-align: center; padding: 0.15rem 0; border-radius: 4px; }
+.month td.weekend { color: var(--muted); }
+.month td.closed { background: var(--ink); color: var(--surface); font-weight: 600; }
+.month td.early { box-shadow: inset 0 0 0 1.5px var(--accent); font-weight: 600; }
+.month td.projected { outline: 1px dashed var(--muted); outline-offset: -1px; }
+
