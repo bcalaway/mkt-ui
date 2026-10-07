@@ -72,15 +72,23 @@ describe("App", () => {
     expect(asked).toContain("/api/instruments?type=cmt_yield");
   });
 
-  it("lists Treasury securities with coupons, on-the-runs and prices", async () => {
+  it("lists Treasury securities on Instruments with coupons, on-the-runs and prices", async () => {
     serve();
-    window.history.replaceState(null, "", "/treasuries");
+    window.history.replaceState(null, "", "/instruments?type=ust");
     render(<App />);
     const link = await screen.findByRole("link", { name: "UST-4.25-2035-08-15" });
-    expect(link.getAttribute("href")).toBe("/treasuries/UST-4.25-2035-08-15");
+    expect(link.getAttribute("href")).toBe("/instruments/UST-4.25-2035-08-15");
     expect(screen.getByText("4.25%")).toBeInTheDocument();
     expect(screen.getByText("10Y")).toBeInTheDocument(); // the on-the-run badge; the issued variant isn't shown
     expect(screen.getByText("99.978944")).toBeInTheDocument();
     expect(screen.getByText("2 securities.")).toBeInTheDocument();
+  });
+
+  it("sends the old Treasuries screen's links to Instruments", async () => {
+    serve();
+    window.history.replaceState(null, "", "/treasuries?type=note");
+    render(<App />);
+    await screen.findByRole("link", { name: "UST-4.25-2035-08-15" });
+    expect(window.location.pathname + window.location.search).toBe("/instruments?type=note");
   });
 });
