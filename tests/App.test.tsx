@@ -79,6 +79,12 @@ const ANSWERS: Record<string, unknown> = {
       { date: "2026-11-27", status: "early_close", holiday: "Day after Thanksgiving", close_time: "14:00", projected: false },
     ],
   },
+  "/api/instruments/UST-10Y-CMT": {
+    name: "UST-10Y-CMT", aliases: [], tenor: "P10Y", description: "US Treasury 10-year constant maturity yield", status: "active",
+    type: "cmt_yield", curve: "UST", currency: "USD", country: "US", calendar: "SIFMA-US",
+    identifiers: [{ scheme: "UST-PAR", value: "BC_10YEAR", valid_from: null, valid_to: null }], notes: [],
+    latest: { date: "2026-10-06", value: "0.041", display: "4.10", source: "UST-PAR" },
+  },
   "/api/instruments/UST-4.25-2035-08-15": {
     name: "UST-4.25-2035-08-15", aliases: ["UST-10Y-OTR"], tenor: "", description: "US Treasury note 4.25% due 2035-08-15",
     status: "active", type: "ust_note", identifiers: [], notes: [], latest: null,
@@ -212,5 +218,15 @@ describe("App", () => {
     fireEvent.click(bars);
     expect(window.location.search).toBe("?style=ohlc");
     expect(await screen.findByRole("button", { name: "OHLC bars" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("charts a CMT's yield with the same controls", async () => {
+    serve();
+    window.history.replaceState(null, "", "/instruments/UST-10Y-CMT");
+    render(<App />);
+    expect(await screen.findByRole("heading", { name: "Yield" })).toBeInTheDocument();
+    expect(screen.getByText("series chart")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "OHLC bars" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText("BC_10YEAR")).toBeInTheDocument();
   });
 });
