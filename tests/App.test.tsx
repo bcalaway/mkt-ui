@@ -13,6 +13,18 @@ const ANSWERS: Record<string, unknown> = {
     { name: "UST-1.5M-CMT", aliases: ["UST-6W-CMT"], tenor: "P6W", description: "1.5-month", status: "active" },
     { name: "UST-10Y-CMT", aliases: [], tenor: "P10Y", description: "10-year", status: "active" },
   ],
+  "/api/securities": {
+    as_of: "2026-10-07",
+    total: 2,
+    securities: [
+      { name: "UST-B-2026-10-08", cusip: "912797UJ4", type: "bill", cmb: false, term: "26-Week", original_term: "26-Week", coupon: "",
+        coupon_display: "", frn_spread: "", issue_date: "2026-04-09", maturity_date: "2026-10-08", status: "active", on_the_run: [],
+        price: { date: "2026-10-06", value: "99.978944", display: "99.978944", source: "TD-PRICES" } },
+      { name: "UST-4.25-2035-08-15", cusip: "91282CNC1", type: "note", cmb: false, term: "10-Year", original_term: "10-Year",
+        coupon: "0.0425", coupon_display: "4.25", frn_spread: "", issue_date: "2025-08-15", maturity_date: "2035-08-15", status: "active",
+        on_the_run: ["UST-10Y-OTR", "UST-10Y-OTR-ISSUED"], price: null },
+    ],
+  },
   "/api/curve": {
     curves: [
       { label: "latest", requested: "2026-10-03", date: "2026-10-02", missing: [],
@@ -58,5 +70,17 @@ describe("App", () => {
     // Only the curve's tenors: thousands of Treasury securities are found by search instead.
     const asked = (fetch as unknown as { mock: { calls: [string][] } }).mock.calls.map(([u]) => u);
     expect(asked).toContain("/api/instruments?type=cmt_yield");
+  });
+
+  it("lists Treasury securities with coupons, on-the-runs and prices", async () => {
+    serve();
+    window.history.replaceState(null, "", "/treasuries");
+    render(<App />);
+    const link = await screen.findByRole("link", { name: "UST-4.25-2035-08-15" });
+    expect(link.getAttribute("href")).toBe("/treasuries/UST-4.25-2035-08-15");
+    expect(screen.getByText("4.25%")).toBeInTheDocument();
+    expect(screen.getByText("10Y")).toBeInTheDocument(); // the on-the-run badge; the issued variant isn't shown
+    expect(screen.getByText("99.978944")).toBeInTheDocument();
+    expect(screen.getByText("2 securities.")).toBeInTheDocument();
   });
 });
