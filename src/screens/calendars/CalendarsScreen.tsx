@@ -77,7 +77,7 @@ function DayLookupPanel({ on }: { on: string }) {
                       ? "Weekend"
                       : c.status === "open"
                         ? "Business day"
-                        : closeText({ date: data.date, status: c.status, holiday: c.holiday, close_time: c.close_time, projected: c.projected })}
+                        : closeText({ date: data.date, status: c.status, holiday: c.holiday, close_time: c.close_time, projected: c.projected, source: "" })}
                 </td>
               </tr>
             ))}
