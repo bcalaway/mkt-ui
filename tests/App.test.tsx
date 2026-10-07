@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 // Charts draw on canvas/SVG measurements jsdom doesn't have: stand-ins here.
@@ -78,6 +78,16 @@ const ANSWERS: Record<string, unknown> = {
       { date: "2026-10-12", status: "closed", holiday: "Columbus Day", close_time: "", projected: false },
       { date: "2026-11-27", status: "early_close", holiday: "Day after Thanksgiving", close_time: "14:00", projected: false },
     ],
+  },
+  "/api/instruments/UST-4.25-2035-08-15": {
+    name: "UST-4.25-2035-08-15", aliases: ["UST-10Y-OTR"], tenor: "", description: "US Treasury note 4.25% due 2035-08-15",
+    status: "active", type: "ust_note", identifiers: [], notes: [], latest: null,
+  },
+  "/api/securities/UST-4.25-2035-08-15": {
+    name: "UST-4.25-2035-08-15", aliases: ["UST-10Y-OTR"], description: "US Treasury note 4.25% due 2035-08-15", status: "active",
+    type: "ust_note", identifiers: [], terms: { maturity_date: "2035-08-15" }, provenance: {}, checks: [], auctions: [],
+    on_the_run: [], index_ratio: null, strip: null,
+    price: { date: "2026-10-06", value: "99.828125", display: "99.828125", source: "TD-PRICES" },
   },
   "/api/curve": {
     curves: [
@@ -190,5 +200,17 @@ describe("App", () => {
     expect(screen.getByText("October")).toBeInTheDocument();
     expect(screen.getByTitle("Early close 14:00: Day after Thanksgiving")).toHaveClass("early");
     expect(screen.getByRole("link", { name: "2027 →" }).getAttribute("href")).toBe("/calendars/SIFMA-US/2027");
+  });
+
+  it("charts a security's price with zoom buttons and lines or OHLC bars", async () => {
+    serve();
+    window.history.replaceState(null, "", "/instruments/UST-4.25-2035-08-15");
+    render(<App />);
+    expect(await screen.findByRole("heading", { name: "Price" })).toBeInTheDocument();
+    const bars = screen.getByRole("button", { name: "OHLC bars" });
+    expect(bars).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(bars);
+    expect(window.location.search).toBe("?style=ohlc");
+    expect(await screen.findByRole("button", { name: "OHLC bars" })).toHaveAttribute("aria-pressed", "true");
   });
 });

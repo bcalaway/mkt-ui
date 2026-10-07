@@ -3,9 +3,10 @@
 // down to days, in cached blocks of bars from mkt-api.
 import { useEffect, useMemo, useState } from "react";
 import { apiGet, type ChartEventOut, type InstrumentSummary } from "../../api/client";
-import type { Preset } from "../../charts/ChartToolbar";
 import LoadStats, { useLoadStats } from "../../charts/LoadStats";
 import { seriesLoader, spreadLoader } from "../../charts/loaders";
+import { OPEN_ON_DAYS, PRESETS } from "../../charts/presets";
+import StyleChips, { isOhlc } from "../../charts/StyleChips";
 import { MAX_SERIES } from "../../charts/theme";
 import type { ChartEvent } from "../../charts/types";
 import ZoomChart from "../../charts/ZoomChart";
@@ -14,14 +15,6 @@ import { useQueryUpdater, type Location } from "../../router";
 import type { Screen } from "../types";
 
 const FIRST = "1962-01-01";
-const PRESETS: Preset[] = [
-  { label: "1M", days: 31 },
-  { label: "6M", days: 183 },
-  { label: "1Y", days: 365 },
-  { label: "5Y", days: 1826 },
-  { label: "10Y", days: 3653 },
-];
-const OPEN_ON_DAYS = 365;
 const SPREADS: { key: string; long: string; short: string; label: string }[] = [
   { key: "2s10s", long: "UST-10Y-CMT", short: "UST-2Y-CMT", label: "10-year minus 2-year" },
   { key: "3m10y", long: "UST-10Y-CMT", short: "UST-3M-CMT", label: "10-year minus 3-month" },
@@ -59,7 +52,7 @@ function SeriesPage({ location }: { location: Location }) {
   const names = slots.filter(Boolean);
   const source = location.query.get("source") ?? "";
   const spreadKey = location.query.get("spread") ?? "2s10s";
-  const ohlc = location.query.get("style") === "ohlc";
+  const ohlc = isOhlc(location);
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
   const [instruments, setInstruments] = useState<InstrumentSummary[]>([]);
@@ -152,13 +145,7 @@ function SeriesPage({ location }: { location: Location }) {
           ))}
       </div>
       <div className="controls" role="group" aria-label="Display">
-        <span className="control-label">Show</span>
-        <button type="button" className="chip" aria-pressed={!ohlc} onClick={() => setQuery({ style: null })}>
-          Lines
-        </button>
-        <button type="button" className="chip" aria-pressed={ohlc} onClick={() => setQuery({ style: "ohlc" })}>
-          OHLC bars
-        </button>
+        <StyleChips ohlc={ohlc} />
         <label>
           Source
           <select value={source} onChange={(e) => setQuery({ source: e.target.value || null })}>

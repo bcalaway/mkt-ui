@@ -7,8 +7,10 @@ import { useEffect, useMemo, useState } from "react";
 import { ApiError, apiGet, type Schemas } from "../../api/client";
 import LoadStats, { useLoadStats } from "../../charts/LoadStats";
 import { PRICES_FIRST_DAY, priceLoader } from "../../charts/loaders";
+import { OPEN_ON_DAYS, PRESETS } from "../../charts/presets";
+import StyleChips, { isOhlc } from "../../charts/StyleChips";
 import ZoomChart from "../../charts/ZoomChart";
-import { linkProps } from "../../router";
+import { linkProps, useLocation } from "../../router";
 
 const PREFIX = "/instruments";
 type Row = Schemas["SecurityRow"];
@@ -156,6 +158,7 @@ export function TreasuryDetail({ name }: { name: string }) {
   const [error, setError] = useState<string | null>(null);
   const stats = useLoadStats();
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const ohlc = isOhlc(useLocation());
 
   useEffect(() => {
     const ctl = new AbortController();
@@ -208,7 +211,19 @@ export function TreasuryDetail({ name }: { name: string }) {
           {loader && (
             <>
               <h2>Price</h2>
-              <ZoomChart loader={loader} first={PRICES_FIRST_DAY} today={today} unit="price" initialDays={365} onInterval={stats.setShown} />
+              <div className="controls" role="group" aria-label="Display">
+                <StyleChips ohlc={ohlc} />
+              </div>
+              <ZoomChart
+                loader={loader}
+                first={PRICES_FIRST_DAY}
+                today={today}
+                unit="price"
+                bars={ohlc}
+                presets={PRESETS}
+                initialDays={OPEN_ON_DAYS}
+                onInterval={stats.setShown}
+              />
               <LoadStats totals={stats.totals} interval={stats.interval} />
             </>
           )}
