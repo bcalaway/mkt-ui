@@ -1,27 +1,19 @@
-// Treasury securities (mkt-data's docs/phase-3.md, step 9): the outstanding
-// bills, notes, bonds, TIPS and FRNs by maturity, with the on-the-runs marked
-// and the latest FedInvest price; and one security's page: its terms (with
-// where each came from), its auctions, its identifiers and its price over time.
+// Treasury securities on the Instruments screen (mkt-data's docs/phase-3.md,
+// step 9): the outstanding bills, notes, bonds, TIPS and FRNs by maturity,
+// with the on-the-runs marked and the latest FedInvest price
+// (/instruments?type=ust, or one kind); and a security's page: its terms
+// (with where each came from), auctions, identifiers and price over time.
 import { useEffect, useMemo, useState } from "react";
 import { ApiError, apiGet, type Schemas } from "../../api/client";
 import LoadStats, { useLoadStats } from "../../charts/LoadStats";
 import { PRICES_FIRST_DAY, priceLoader } from "../../charts/loaders";
 import ZoomChart from "../../charts/ZoomChart";
-import { linkProps, useQueryUpdater, type Location } from "../../router";
-import type { Screen } from "../types";
+import { linkProps } from "../../router";
 
-const PREFIX = "/treasuries";
+const PREFIX = "/instruments";
 type Row = Schemas["SecurityRow"];
 type Detail = Schemas["SecurityDetail"];
 
-const TYPES: { key: string; label: string }[] = [
-  { key: "", label: "All" },
-  { key: "bill", label: "Bills" },
-  { key: "note", label: "Notes" },
-  { key: "bond", label: "Bonds" },
-  { key: "tips", label: "TIPS" },
-  { key: "frn", label: "FRNs" },
-];
 const TYPE_LABEL: Record<string, string> = { bill: "Bill", note: "Note", bond: "Bond", tips: "TIPS", frn: "FRN" };
 
 /** "UST-10Y-OTR" -> "10Y", "UST-5Y-TII-OTR" -> "5Y TIPS", "UST-2Y-FRN-OTR" -> "2Y FRN"; issued variants left out. */
@@ -38,10 +30,9 @@ function couponText(r: Row): string {
   return r.cmb ? "CMB" : "Bill";
 }
 
-function ListPage({ location }: { location: Location }) {
-  const setQuery = useQueryUpdater();
-  const type = location.query.get("type") ?? "";
-  const all = location.query.get("all") === "1";
+/** Treasury securities of one kind (or every kind, `ust`), outstanding or with matured ones too. */
+export function TreasuryList({ type, all }: { type: string; all: boolean }) {
+  const kind = type === "ust" ? "" : type;
   const [data, setData] = useState<Schemas["SecurityListResponse"] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,34 +41,16 @@ function ListPage({ location }: { location: Location }) {
     setData(null);
     setError(null);
     apiGet("/api/securities", {
-      query: { type: (type || undefined) as Row["type"] | undefined, include_inactive: all || undefined, limit: all ? 6000 : 1000 },
+      query: { type: (kind || undefined) as Row["type"] | undefined, include_inactive: all || undefined, limit: all ? 6000 : 1000 },
       signal: ctl.signal,
     })
       .then(setData)
       .catch((e: Error) => e.name !== "AbortError" && setError(e.message));
     return () => ctl.abort();
-  }, [type, all]);
+  }, [kind, all]);
 
   return (
-    <section>
-      <header className="screen-head">
-        <h1>Treasury securities</h1>
-        <p className="lede">
-          {all ? "Every marketable Treasury security since 1980" : "The marketable Treasury securities outstanding"}, by maturity, with the on-the-run
-          issues marked and FedInvest's latest end-of-day price per 100. Open one for its terms, auctions and price history.
-        </p>
-      </header>
-      <div className="controls" role="group" aria-label="Type">
-        {TYPES.map((t) => (
-          <button key={t.key || "all"} type="button" className="chip" aria-pressed={type === t.key} onClick={() => setQuery({ type: t.key || null })}>
-            {t.label}
-          </button>
-        ))}
-        <label>
-          <input type="checkbox" checked={all} onChange={(e) => setQuery({ all: e.target.checked ? "1" : null })} />
-          Include matured
-        </label>
-      </div>
+    <>
       {error && <p className="error">Couldn't load securities: {error}</p>}
       {!error && !data && <p className="muted">Loading…</p>}
       {data && (
@@ -131,7 +104,7 @@ function ListPage({ location }: { location: Location }) {
           </table>
         </>
       )}
-    </section>
+    </>
   );
 }
 
@@ -177,7 +150,8 @@ function amount(v: string): string {
   return /^\d+(\.0+)?$/.test(v) ? v.replace(/\.0+$/, "").replace(/\B(?=(\d{3})+(?!\d))/g, ",") : v;
 }
 
-function DetailPage({ name }: { name: string }) {
+/** A Treasury security's page: price, price over time, terms, auctions, identifiers. */
+export function TreasuryDetail({ name }: { name: string }) {
   const [d, setD] = useState<Detail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const stats = useLoadStats();
@@ -204,7 +178,7 @@ function DetailPage({ name }: { name: string }) {
   return (
     <section>
       <p>
-        <a {...linkProps(PREFIX)}>All Treasury securities</a>
+        <a {...linkProps(`${PREFIX}?type=ust`)}>All Treasury securities</a>
       </p>
       {error && <p className="error">{error}</p>}
       {!error && !d && <p className="muted">Loading…</p>}
@@ -318,17 +292,3 @@ function DetailPage({ name }: { name: string }) {
     </section>
   );
 }
-
-function TreasuriesPage({ location }: { location: Location }) {
-  const rest = location.path.slice(PREFIX.length).replace(/^\//, "");
-  if (rest) return <DetailPage name={decodeURIComponent(rest)} />;
-  return <ListPage location={location} />;
-}
-
-export const treasuriesScreen: Screen = {
-  id: "treasuries",
-  title: "Treasuries",
-  path: PREFIX,
-  matches: (path) => path === PREFIX || path.startsWith(`${PREFIX}/`),
-  Component: TreasuriesPage,
-};
