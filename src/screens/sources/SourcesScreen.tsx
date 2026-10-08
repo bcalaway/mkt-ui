@@ -17,6 +17,7 @@ type Text = Schemas["CaptureTextOut"];
 const TEXT_PAGE = 200;
 
 const GROUPS: { key: string; title: string; note: string }[] = [
+  { key: "futures", title: "Fixings and positioning", note: "SOFR, EFFR, FX rates and the CFTC's weekly report, for the futures: a month or a report at a time." },
   { key: "securities", title: "Treasury securities", note: "Auctions, prices, STRIPS and CPI: a page a day, month or year." },
   { key: "rates", title: "CMT yields", note: "Treasury's par curve and the Fed's H.15, a month at a time." },
   { key: "calendars", title: "Calendars", note: "Holiday and early-close pages, and the rules files." },
@@ -26,6 +27,15 @@ const STATUS_LABEL: Record<string, string> = {
   ok: "OK", error: "Error", never: "Not captured yet", raw: "Kept raw", late: "Late",
 };
 const PERIOD_LABEL: Record<string, string> = { day: "By day", month: "By month", year: "By year" };
+
+/** The known groups, then any group the API sends that this screen doesn't know yet, so no source is ever hidden. */
+export function withOthers<G extends { key: string; title: string; note: string }>(
+  groups: G[], rows: { group: string }[],
+): { key: string; title: string; note: string }[] {
+  const known = new Set(groups.map((g) => g.key));
+  const others = [...new Set(rows.map((r) => r.group))].filter((k) => !known.has(k));
+  return [...groups, ...others.map((k) => ({ key: k, title: k, note: "" }))];
+}
 
 /** "3 h ago", "2 days ago": how long before now an ISO timestamp was; "" for none. */
 export function ago(iso: string, now: Date = new Date()): string {
@@ -95,7 +105,7 @@ function ListPage() {
             {failing.length ? `the last check failed for ${failing.map((s) => s.name).join(", ")}.` : "every last check worked."}
             {late.length > 0 && ` Late against their schedule: ${late.map((s) => s.name).join(", ")}.`}
           </p>
-          {GROUPS.map((g) => {
+          {withOthers(GROUPS, rows).map((g) => {
             const group = rows.filter((s) => s.group === g.key);
             if (!group.length) return null;
             return (

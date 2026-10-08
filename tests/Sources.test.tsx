@@ -7,6 +7,7 @@ vi.mock("../src/charts/CurveChart", () => ({ default: () => <div>curve chart</di
 vi.mock("../src/charts/ZoomChart", () => ({ default: () => <div>series chart</div> }));
 
 import App from "../src/App";
+import { withOthers } from "../src/screens/sources/SourcesScreen";
 
 const PRICES = {
   name: "TD-PRICES", group: "securities", calendar: "SIFMA-US", kind: "published", period_kind: "day", url: "https://www.treasurydirect.gov/",
@@ -79,5 +80,14 @@ describe("Sources", () => {
     expect(window.location.search).toBe("?q=912828");
     await screen.findByText("Prices For: October 1, 2026");
     expect(asked()).toContain("/api/captures/8099/text?contains=912828&context=2&offset=0&limit=200");
+  });
+});
+
+describe("source groups", () => {
+  it("keeps the known groups in order and adds any group it doesn't know", () => {
+    const groups = [{ key: "futures", title: "Fixings and positioning", note: "" }, { key: "rates", title: "CMT yields", note: "" }];
+    const got = withOthers(groups, [{ group: "rates" }, { group: "energy" }, { group: "futures" }, { group: "energy" }]);
+    expect(got.map((g) => g.key)).toEqual(["futures", "rates", "energy"]);
+    expect(got[2].title).toBe("energy");
   });
 });
