@@ -167,17 +167,20 @@ export default function ZoomChart({
         marked.set(at.date, [...(marked.get(at.date) ?? []), ev]);
         markers[k].push({ time: at.date as Time, position: "aboveBar", shape: "circle", color: theme.muted, text: ev.title, size: 0.6 });
       }
+      // No series title: lightweight-charts draws a title beside the last-value label, out over the plot's right
+      // edge, which is the latest data (Bill, 2026-10-08). The axis label shows the value in the line's colour;
+      // the screens' legend and the tooltip name the lines.
       series = loaded.lines.map((line, k) => {
         const color = theme.series[line.slot % theme.series.length];
         const gaps: WhitespaceData<Time>[] = blanks[k].map((d) => ({ time: d as Time }));
         const byTime = <T extends { time: Time }>(a: T, b: T) => (String(a.time) < String(b.time) ? -1 : 1);
         let s: ISeriesApi<SeriesType>;
         if (bars) {
-          const b = chart.addSeries(BarSeries, { upColor: color, downColor: color, priceLineVisible: false, title: line.label });
+          const b = chart.addSeries(BarSeries, { upColor: color, downColor: color, priceLineVisible: false });
           b.setData([...line.points.map((p) => ({ time: p.date as Time, open: p.bar?.open ?? p.plot, high: p.bar?.high ?? p.plot, low: p.bar?.low ?? p.plot, close: p.plot })), ...gaps].sort(byTime));
           s = b as unknown as ISeriesApi<SeriesType>;
         } else {
-          const l = chart.addSeries(LineSeries, { color, lineWidth: 2, priceLineVisible: false, title: line.label });
+          const l = chart.addSeries(LineSeries, { color, lineWidth: 2, priceLineVisible: false });
           l.setData([...line.points.map((p) => ({ time: p.date as Time, value: p.plot })), ...gaps].sort(byTime));
           s = l as unknown as ISeriesApi<SeriesType>;
         }
