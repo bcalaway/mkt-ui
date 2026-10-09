@@ -1,7 +1,7 @@
 // Sources (mkt-data's docs/phase-3.md, step 8): every source mkt-data
 // captures (the calendar pages, the CMT yields, the Treasury securities
 // sources), with how its captures are going: the last successful fetch, the
-// last check and any error, errors this week, what's stored and the periods
+// last check and any error, errors this week that no later fetch has fixed, what's stored and the periods
 // covered. A source's page lists its newest fetch attempts and its periods by
 // year. The same facts as Grafana's Captures row and home-mcp's
 // mkt_data_checks, readable without either.
@@ -119,7 +119,9 @@ function ListPage() {
                       <th scope="col">Calendar</th>
                       <th scope="col">Status</th>
                       <th scope="col">Last fetch that worked</th>
-                      <th scope="col" className="num">Errors, 7 days</th>
+                      <th scope="col" className="num" title="Failed fetches or parses in the last 7 days that no later check of the same period has fixed">
+                        Unfixed errors, 7 days
+                      </th>
                       <th scope="col">Periods</th>
                       <th scope="col" className="num">Stored</th>
                     </tr>
@@ -136,8 +138,8 @@ function ListPage() {
                           <StatusBadge s={s} />
                         </td>
                         <td title={`${when(s.last_success_at)}; ${s.schedule}`}>{ago(s.last_success_at) || <span className="muted">—</span>}</td>
-                        <td className={`num${s.errors_7d ? " error" : ""}`}>
-                          {s.errors_7d} of {s.checks_7d}
+                        <td className={`num${s.errors_7d ? " error" : " muted"}`} title={`${s.checks_7d} checks in 7 days`}>
+                          {s.errors_7d || "—"}
                         </td>
                         <td className="muted">{periodsText(s)}</td>
                         <td className="num">
@@ -214,7 +216,7 @@ function DetailPage({ name }: { name: string }) {
             </dd>
             <dt>This week</dt>
             <dd>
-              {s.checks_7d} checks, {s.errors_7d} with errors
+              {s.checks_7d} checks, {s.errors_7d ? `${s.errors_7d} unfixed ${s.errors_7d === 1 ? "error" : "errors"}` : "no unfixed errors"}
             </dd>
             <dt>Stored</dt>
             <dd>
