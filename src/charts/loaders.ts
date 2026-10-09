@@ -21,7 +21,7 @@ export type Recorder = (stat: RequestStat) => void;
 // (mkt-api #11, 2026-10-06).
 type Field = "open" | "high" | "low" | "close";
 function shown(b: Bar, f: Field): string {
-  return b[`${f}_display`];
+  return b[`${f}_display` as const];
 }
 
 function shownInputs(b: Bar): string[] {
