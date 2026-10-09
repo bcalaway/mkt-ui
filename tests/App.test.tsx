@@ -142,6 +142,33 @@ describe("App", () => {
     expect(asked).toContain("/api/instruments?type=cmt_yield");
   });
 
+  it("pages search results 50 at a time", async () => {
+    const matches = Array.from({ length: 120 }, (_, i) => ({
+      name: `EUR${String(i).padStart(3, "0")}-ECB`, aliases: [], tenor: "", description: "ECB rate", status: "active", type: "fx_fixing",
+    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        const q = new URLSearchParams(url.split("?")[1] ?? "");
+        const offset = Number(q.get("offset") ?? 0);
+        const body = url.startsWith("/api/search") ? matches.slice(offset, offset + Number(q.get("limit"))) : [];
+        return Promise.resolve({ ok: true, status: 200, statusText: "", json: () => Promise.resolve(body) });
+      }),
+    );
+    window.history.replaceState(null, "", "/instruments?q=ECB");
+    render(<App />);
+    expect(await screen.findByRole("link", { name: "EUR049-ECB" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "EUR050-ECB" })).toBeNull();
+    expect(screen.getAllByText("1–50, more after")).toHaveLength(2);
+    fireEvent.click(screen.getAllByRole("button", { name: "Next 50" })[0]);
+    expect(await screen.findByRole("link", { name: "EUR050-ECB" })).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("button", { name: "Next 50" })[0]);
+    expect(await screen.findByRole("link", { name: "EUR119-ECB" })).toBeInTheDocument();
+    expect(screen.getByText("101–120")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next 50" })).toBeDisabled();
+    expect(window.location.search).toBe("?q=ECB&start=100");
+  });
+
   it("lists Treasury securities on Instruments with coupons, on-the-runs and prices", async () => {
     serve();
     window.history.replaceState(null, "", "/instruments?type=ust");
