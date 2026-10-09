@@ -59,6 +59,16 @@ describe("Sources", () => {
     expect(screen.getByText("Late against their schedule: TD-PRICES.", { exact: false })).toBeInTheDocument();
   });
 
+  it("counts only errors that haven't been fixed", async () => {
+    serve();
+    window.history.replaceState(null, "", "/sources");
+    render(<App />);
+    expect(await screen.findByText("Unfixed errors, 7 days")).toBeInTheDocument();
+    window.history.replaceState(null, "", "/sources/TD-PRICES");
+    render(<App />);
+    expect(await screen.findByText("5 checks, no unfixed errors")).toBeInTheDocument();
+  });
+
   it("says what a source gives and when it's fetched, and links each capture to its text", async () => {
     serve();
     window.history.replaceState(null, "", "/sources/TD-PRICES");
