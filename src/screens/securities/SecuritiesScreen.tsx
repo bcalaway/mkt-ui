@@ -32,13 +32,16 @@ const TYPES: { key: string; label: string }[] = [
   { key: "frn", label: "FRNs" },
 ];
 
+// Search results a page at a time: ask for one more than a page, so a match past it says there's a next one.
+const PAGE = 50;
+
 const SCHEME_LABEL: Record<string, string> = {
   "UST-PAR": "Treasury par curve",
   "H15-TCM": "Fed H.15",
   FRED: "FRED",
 };
 
-function ListPage({ query, type, all }: { query: string; type: string; all: boolean }) {
+function ListPage({ query, type, all, start }: { query: string; type: string; all: boolean; start: number }) {
   const setQuery = useQueryUpdater();
   const treasuries = !query && TREASURY_TYPES.includes(type);
   const [text, setText] = useState(query);
@@ -50,11 +53,27 @@ function ListPage({ query, type, all }: { query: string; type: string; all: bool
     const ctl = new AbortController();
     setError(null);
     const req = query
-      ? apiGet("/api/search", { query: { q: query, limit: 50 }, signal: ctl.signal })
+      ? apiGet("/api/search", { query: { q: query, limit: PAGE + 1, offset: start }, signal: ctl.signal })
       : apiGet("/api/instruments", { query: { type: "cmt_yield" }, signal: ctl.signal });
     req.then(setRows).catch((e: Error) => e.name !== "AbortError" && setError(e.message));
     return () => ctl.abort();
-  }, [query, treasuries]);
+  }, [query, treasuries, start]);
+  const more = !!query && !!rows && rows.length > PAGE;
+  const shown = query && rows ? rows.slice(0, PAGE) : rows;
+  const pager = query && rows && (start > 0 || more) && (
+    <nav className="controls" aria-label="Pages">
+      <button type="button" disabled={start === 0} onClick={() => setQuery({ start: start > PAGE ? String(start - PAGE) : null })}>
+        Previous {PAGE}
+      </button>
+      <span className="muted">
+        {shown && shown.length > 0 ? `${start + 1}–${start + shown.length}` : "None"}
+        {more ? ", more after" : ""}
+      </span>
+      <button type="button" disabled={!more} onClick={() => setQuery({ start: String(start + PAGE) })}>
+        Next {PAGE}
+      </button>
+    </nav>
+  );
 
   return (
     <section>
@@ -73,7 +92,7 @@ function ListPage({ query, type, all }: { query: string; type: string; all: bool
             type="button"
             className="chip"
             aria-pressed={!query && type === t.key}
-            onClick={() => setQuery({ type: t.key === "cmt" ? null : t.key, q: null, all: TREASURY_TYPES.includes(t.key) && all ? "1" : null })}
+            onClick={() => setQuery({ type: t.key === "cmt" ? null : t.key, q: null, start: null, all: TREASURY_TYPES.includes(t.key) && all ? "1" : null })}
           >
             {t.label}
           </button>
@@ -90,7 +109,7 @@ function ListPage({ query, type, all }: { query: string; type: string; all: bool
         role="search"
         onSubmit={(e) => {
           e.preventDefault();
-          setQuery({ q: text.trim() || null });
+          setQuery({ q: text.trim() || null, start: null });
         }}
       >
         <label>
@@ -99,7 +118,7 @@ function ListPage({ query, type, all }: { query: string; type: string; all: bool
         </label>
         <button type="submit">Search</button>
         {query && (
-          <button type="button" className="quiet" onClick={() => { setText(""); setQuery({ q: null }); }}>
+          <button type="button" className="quiet" onClick={() => { setText(""); setQuery({ q: null, start: null }); }}>
             Clear the search
           </button>
         )}
@@ -107,8 +126,9 @@ function ListPage({ query, type, all }: { query: string; type: string; all: bool
       {treasuries && <TreasuryList type={type} all={all} />}
       {!treasuries && error && <p className="error">Couldn't load instruments: {error}</p>}
       {!treasuries && !error && !rows && <p className="muted">Loading…</p>}
-      {!treasuries && rows && rows.length === 0 && <p className="muted">Nothing matches “{query}”. Try a tenor like 10Y or a source key like BC_10YEAR.</p>}
-      {!treasuries && rows && rows.length > 0 && (
+      {!treasuries && rows && rows.length === 0 && start === 0 && <p className="muted">Nothing matches “{query}”. Try a tenor like 10Y or a source key like BC_10YEAR.</p>}
+      {!treasuries && pager}
+      {!treasuries && shown && shown.length > 0 && (
         <table className="data">
           <thead>
             <tr>
@@ -119,7 +139,7 @@ function ListPage({ query, type, all }: { query: string; type: string; all: bool
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
+            {shown.map((r) => (
               <tr key={r.name}>
                 <th scope="row">
                   <a {...linkProps(`${PREFIX}/${encodeURIComponent(r.name)}`)}>{r.name}</a>
@@ -132,6 +152,7 @@ function ListPage({ query, type, all }: { query: string; type: string; all: bool
           </tbody>
         </table>
       )}
+      {!treasuries && shown && shown.length > 20 && pager}
     </section>
   );
 }
@@ -291,6 +312,7 @@ function SecuritiesPage({ location: asked }: { location: Location }) {
       query={location.query.get("q") ?? ""}
       type={location.query.get("type") ?? "cmt"}
       all={location.query.get("all") === "1"}
+      start={Math.max(0, Number.parseInt(location.query.get("start") ?? "0", 10) || 0)}
     />
   );
 }
