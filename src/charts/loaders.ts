@@ -18,16 +18,14 @@ export type Recorder = (stat: RequestStat) => void;
 
 // mkt-api's values are decimals ("0.041"), each with a display form in the
 // series' unit ("4.10" percent, "52" bp) that's what the chart plots and shows
-// (mkt-api #11, 2026-10-06). Blocks the browser cached before then (kept up to
-// a day) have no display fields: their values were already in display units.
-// The fallback can go after 2026-10-08.
+// (mkt-api #11, 2026-10-06).
 type Field = "open" | "high" | "low" | "close";
 function shown(b: Bar, f: Field): string {
-  return (b[`${f}_display` as keyof Bar] as string | undefined) ?? b[f];
+  return b[`${f}_display`];
 }
 
 function shownInputs(b: Bar): string[] {
-  return (b.inputs_display as string[] | undefined) ?? b.inputs;
+  return b.inputs_display;
 }
 
 /** A bar in the chart's terms: drawn from the display forms, shown as given. */
