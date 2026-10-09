@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-// The Calendars screen's year page: each close's source, the calendar's sources, a day's history and disagreements.
+// The Calendars screen: the list's "Coming up" table (calendars as rows), and the year page's sources, a day's
+// history and disagreements. Dates are YYYY-MM-DD with the weekday on this screen.
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -7,11 +8,37 @@ vi.mock("../src/charts/CurveChart", () => ({ default: () => <div>curve chart</di
 vi.mock("../src/charts/ZoomChart", () => ({ default: () => <div>series chart</div> }));
 
 import App from "../src/App";
+import { dayDate, weekdaysFrom } from "../src/screens/calendars/CalendarsScreen";
 
 const close = (date: string, status: string, holiday: string, close_time = "") =>
   ({ date, status, holiday, close_time, projected: false, source: "SIFMA-US-HOLIDAYS" });
 
 const ANSWERS: Record<string, unknown> = {
+  "/api/calendars": {
+    as_of: "2026-10-09",
+    calendars: [
+      { name: "SIFMA-US", description: "US bond market", timezone: "America/New_York", first_year: 1990, last_year: 2100,
+        coverage: { published: 2, rules: 30, projected: 70, last_published_year: 2027 },
+        next_close: close("2026-10-12", "closed", "Columbus Day"), next_early_close: close("2026-11-27", "early_close", "Day after Thanksgiving", "14:00") },
+      { name: "KR", description: "Korean won", timezone: "Asia/Seoul", first_year: 2010, last_year: 2035,
+        coverage: { published: 0, rules: 18, projected: 8, last_published_year: 0 },
+        next_close: close("2026-10-09", "closed", "Hangul Day"), next_early_close: null },
+    ],
+  },
+  "/api/calendars/upcoming": {
+    start: "2026-10-09", end: "2026-10-23", calendars: ["SIFMA-US", "KR"],
+    days: [
+      { date: "2026-10-09", calendars: { KR: close("2026-10-09", "closed", "Hangul Day") } },
+      { date: "2026-10-12", calendars: { "SIFMA-US": close("2026-10-12", "closed", "Columbus Day") } },
+    ],
+  },
+  "/api/calendars/day": {
+    date: "2026-12-25", weekday: "Friday",
+    calendars: [
+      { calendar: "SIFMA-US", covered: true, business_day: false, status: "closed", holiday: "Christmas Day", close_time: "", projected: false },
+      { calendar: "KR", covered: true, business_day: false, status: "closed", holiday: "Christmas Day", close_time: "", projected: false },
+    ],
+  },
   "/api/calendars/SIFMA-US/2026": {
     calendar: "SIFMA-US", timezone: "America/New_York", year: 2026, source: "SIFMA-US-HOLIDAYS", kind: "published",
     closes: [close("2026-04-03", "early_close", "Good Friday", "12:00"), close("2026-10-12", "closed", "Columbus Day")],
@@ -92,5 +119,25 @@ describe("Calendars year page", () => {
     expect(screen.queryByText("Christmas Eve (SIFMA recommendation)", { exact: false })).not.toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("Every year"));
     expect(screen.getByText("Christmas Eve (SIFMA recommendation)", { exact: false })).toBeInTheDocument();
+  });
+});
+
+describe("Calendars list", () => {
+  it("formats dates as YYYY-MM-DD with the weekday, and counts weekdays", () => {
+    expect(dayDate("2026-10-12")).toBe("2026-10-12 Mon");
+    expect(weekdaysFrom("2026-10-09", 3)).toEqual(["2026-10-09", "2026-10-12", "2026-10-13"]);
+  });
+
+  it("shows calendars as rows: the next weekdays, a picked day, the next close and early close", async () => {
+    serve();
+    window.history.replaceState(null, "", "/calendars?date=2026-12-25");
+    render(<App />);
+    expect(await screen.findByRole("columnheader", { name: "2026-10-12 Mon" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Next close" })).toBeInTheDocument();
+    expect(await screen.findByText("Closed: Hangul Day")).toBeInTheDocument();
+    expect(screen.getAllByText("Closed: Christmas Day")).toHaveLength(2);
+    expect(screen.getByText("2026-10-12 Mon, Columbus Day")).toBeInTheDocument();
+    expect(screen.getByText("2026-11-27 Fri, 14:00")).toBeInTheDocument();
+    expect(screen.queryByText("Is it a business day?")).not.toBeInTheDocument();
   });
 });
