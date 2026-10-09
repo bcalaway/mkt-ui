@@ -1,8 +1,9 @@
 // Calendars (mkt-data's docs/phase-3.md, step 8): calendar-svc's golden
-// holiday calendars (FED, SIFMA-US, NYSE). The list shows each calendar's
-// coverage and next closes, the upcoming closes side by side (where the
-// calendars differ), and a day lookup; a calendar's year is twelve month
-// grids with closes and early closes marked, and the source that decided it.
+// holiday calendars. The list shows each calendar's coverage, then one row per
+// calendar for the next few weekdays, a day picked by date, and the next close
+// and early close; a calendar's year is twelve month grids with closes and
+// early closes marked, and the source that decided it. Dates are YYYY-MM-DD
+// everywhere (Bill, 2026-10-09); this screen alone adds the weekday.
 import { useEffect, useState } from "react";
 import { ApiError, apiGet, type Schemas } from "../../api/client";
 import { linkProps, useQueryUpdater, type Location } from "../../router";
@@ -29,10 +30,27 @@ export function closeText(c: CloseOut): string {
   return `${what}${c.holiday ? `: ${c.holiday}` : ""}${c.projected ? " (projected)" : ""}`;
 }
 
-function shortDate(iso: string): string {
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** "2026-10-12 Mon": the date as YYYY-MM-DD with its weekday (this screen only). */
+export function dayDate(iso: string): string {
   const d = new Date(`${iso}T12:00:00Z`);
-  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+  return Number.isNaN(d.getTime()) ? iso : `${iso} ${DAY_NAMES[d.getUTCDay()]}`;
 }
+
+/** The first `n` weekdays from `start` (YYYY-MM-DD), itself included. */
+export function weekdaysFrom(start: string, n: number): string[] {
+  const out: string[] = [];
+  let t = Date.parse(`${start}T12:00:00Z`);
+  while (out.length < n && !Number.isNaN(t)) {
+    const d = new Date(t);
+    if (d.getUTCDay() !== 0 && d.getUTCDay() !== 6) out.push(d.toISOString().slice(0, 10));
+    t += 86_400_000;
+  }
+  return out;
+}
+
+const DAYS_SHOWN = 5;
 
 function useApi<T>(load: (signal: AbortSignal) => Promise<T>, deps: unknown[]): { data: T | null; error: string | null } {
   const [data, setData] = useState<T | null>(null);
@@ -50,83 +68,87 @@ function useApi<T>(load: (signal: AbortSignal) => Promise<T>, deps: unknown[]): 
   return { data, error };
 }
 
-function DayLookupPanel({ on }: { on: string }) {
-  const setQuery = useQueryUpdater();
-  const { data, error } = useApi<DayLookup>(
-    (signal) => apiGet("/api/calendars/day", { query: { date: on || undefined }, signal }),
-    [on],
-  );
-  return (
-    <section>
-      <h2>Is it a business day?</h2>
-      <div className="controls">
-        <label>
-          Date
-          <input type="date" value={on || data?.date || ""} onChange={(e) => setQuery({ date: e.target.value || null })} />
-        </label>
-        {data && <span className="muted">{data.weekday}</span>}
-      </div>
-      {error && <p className="error">{error}</p>}
-      {data && (
-        <table className="data">
-          <tbody>
-            {data.calendars.map((c) => (
-              <tr key={c.calendar}>
-                <th scope="row">{c.calendar}</th>
-                <td className={c.business_day ? undefined : "error"}>
-                  {!c.covered
-                    ? "Not covered: no source has this year"
-                    : c.status === "weekend"
-                      ? "Weekend"
-                      : c.status === "open"
-                        ? "Business day"
-                        : closeText({ date: data.date, status: c.status, holiday: c.holiday, close_time: c.close_time, projected: c.projected, source: "" })}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </section>
-  );
+type LookupCalendar = DayLookup["calendars"][number];
+
+function lookupText(c: LookupCalendar, date: string): string {
+  if (!c.covered) return "Not covered";
+  if (c.status === "weekend") return "Weekend";
+  if (c.status === "open") return "Open";
+  return closeText({ date, status: c.status, holiday: c.holiday, close_time: c.close_time, projected: c.projected, source: "" });
 }
 
-function UpcomingTable({ u }: { u: Upcoming }) {
+/** Calendars as rows: the next few weekdays, a day picked by date, and the next close and early close. */
+function ComingUpTable({ list, on }: { list: Calendars; on: string }) {
+  const setQuery = useQueryUpdater();
+  const upcoming = useApi<Upcoming>((signal) => apiGet("/api/calendars/upcoming", { query: { days: 14 }, signal }), []);
+  const lookup = useApi<DayLookup>((signal) => apiGet("/api/calendars/day", { query: { date: on || undefined }, signal }), [on]);
+  const days = weekdaysFrom(upcoming.data?.start ?? list.as_of.slice(0, 10), DAYS_SHOWN);
+  const byDay = new Map((upcoming.data?.days ?? []).map((d) => [d.date, d.calendars]));
+  const picked = new Map((lookup.data?.calendars ?? []).map((c) => [c.calendar, c]));
+  const pickedDate = on || lookup.data?.date || "";
   return (
-    <>
+    <section>
+      <h2>Coming up</h2>
       <p className="muted">
-        Closes and early closes from {u.start} to {u.end}. A blank cell is a business day on that calendar.
+        The next {DAYS_SHOWN} weekdays on each calendar, any day you pick, and each calendar's next close and early close.
       </p>
-      <table className="data">
+      {upcoming.error && <p className="error">{upcoming.error}</p>}
+      {lookup.error && <p className="error">{lookup.error}</p>}
+      <div className="scroll-x">
+      <table className="data coming-up">
         <thead>
           <tr>
-            <th scope="col">Date</th>
-            {u.calendars.map((n) => (
-              <th key={n} scope="col">
-                {n}
+            <th scope="col">Calendar</th>
+            {days.map((d) => (
+              <th key={d} scope="col">
+                {dayDate(d)}
               </th>
             ))}
+            <th scope="col">
+              <label>
+                <span className="visually-hidden">Pick a date</span>
+                <input type="date" value={pickedDate} onChange={(e) => setQuery({ date: e.target.value || null })} />
+              </label>
+              {pickedDate && <div className="muted">{DAY_NAMES[new Date(`${pickedDate}T12:00:00Z`).getUTCDay()]}</div>}
+            </th>
+            <th scope="col">Next close</th>
+            <th scope="col">Next early close</th>
           </tr>
         </thead>
         <tbody>
-          {u.days.map((d) => (
-            <tr key={d.date}>
-              <td>{shortDate(d.date)}</td>
-              {u.calendars.map((n) => {
-                const c = d.calendars[n];
-                return <td key={n}>{c ? closeText(c) : ""}</td>;
-              })}
-            </tr>
-          ))}
+          {list.calendars.map((c) => {
+            const p = picked.get(c.name);
+            return (
+              <tr key={c.name}>
+                <th scope="row">{c.name}</th>
+                {days.map((d) => {
+                  const x = byDay.get(d)?.[c.name];
+                  const covered = Number(d.slice(0, 4)) >= c.first_year && Number(d.slice(0, 4)) <= c.last_year;
+                  return (
+                    <td key={d} className={x ? (x.status === "early_close" ? undefined : "error") : "muted"}>
+                      {!upcoming.data ? "" : x ? closeText(x) : covered ? "Open" : "Not covered"}
+                    </td>
+                  );
+                })}
+                <td className={p && !p.business_day ? "error" : p ? "muted" : undefined}>{p ? lookupText(p, pickedDate) : ""}</td>
+                <td>{c.next_close ? `${dayDate(c.next_close.date)}, ${c.next_close.holiday}` : <span className="muted">—</span>}</td>
+                <td>
+                  {c.next_early_close
+                    ? `${dayDate(c.next_early_close.date)}, ${c.next_early_close.close_time}`
+                    : <span className="muted">—</span>}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
-    </>
+      </div>
+    </section>
   );
 }
 
 function ListPage({ on }: { on: string }) {
   const list = useApi<Calendars>((signal) => apiGet("/api/calendars", { signal }), []);
-  const upcoming = useApi<Upcoming>((signal) => apiGet("/api/calendars/upcoming", { query: { days: 180 }, signal }), []);
   const thisYear = list.data ? Number(list.data.as_of.slice(0, 4)) : new Date().getFullYear();
 
   return (
@@ -135,7 +157,7 @@ function ListPage({ on }: { on: string }) {
         <h1>Calendars</h1>
         <p className="lede">
           The holiday calendars the platform schedules by, as calendar-svc holds them: which years each covers and from what
-          kind of source, the next closes, and where the calendars differ.
+          kind of source, and what's coming up on each.
         </p>
       </header>
       {list.error && <p className="error">Couldn't load calendars: {list.error}</p>}
@@ -148,8 +170,6 @@ function ListPage({ on }: { on: string }) {
               <th scope="col">Years</th>
               <th scope="col">Published to</th>
               <th scope="col" className="num">Published · rules · projected</th>
-              <th scope="col">Next close</th>
-              <th scope="col">Next early close</th>
             </tr>
           </thead>
           <tbody>
@@ -166,25 +186,13 @@ function ListPage({ on }: { on: string }) {
                 <td className="num">
                   {c.coverage.published} · {c.coverage.rules} · {c.coverage.projected}
                 </td>
-                <td>{c.next_close ? `${shortDate(c.next_close.date)}, ${c.next_close.holiday}` : <span className="muted">—</span>}</td>
-                <td>
-                  {c.next_early_close
-                    ? `${shortDate(c.next_early_close.date)}, ${c.next_early_close.close_time}`
-                    : <span className="muted">—</span>}
-                </td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
 
-      <DayLookupPanel on={on} />
-
-      <section>
-        <h2>Coming up</h2>
-        {upcoming.error && <p className="error">{upcoming.error}</p>}
-        {upcoming.data && <UpcomingTable u={upcoming.data} />}
-      </section>
+      {list.data && <ComingUpTable list={list.data} on={on} />}
     </section>
   );
 }
@@ -278,7 +286,7 @@ function DayHistoryPanel({ name, day }: { name: string; day: string }) {
   return (
     <section className="day-history">
       <h2>
-        {shortDate(day)} on {name}{" "}
+        {dayDate(day)} on {name}{" "}
         <button type="button" className="chip" onClick={() => setQuery({ day: null })}>
           Close
         </button>
@@ -362,7 +370,7 @@ function DisagreementsPanel({ name, year }: { name: string; year: number }) {
                 {rows.map((d) => (
                   <tr key={`${d.date}:${d.source}`}>
                     <td>
-                      <a {...linkProps(`${PREFIX}/${name}/${d.date.slice(0, 4)}?day=${d.date}`)}>{shortDate(d.date)}</a>
+                      <a {...linkProps(`${PREFIX}/${name}/${d.date.slice(0, 4)}?day=${d.date}`)}>{dayDate(d.date)}</a>
                     </td>
                     <td>{DIFFERS_LABEL[d.differs] ?? d.differs}</td>
                     <td>
@@ -441,7 +449,7 @@ function YearPage({ name, year, day }: { name: string; year: number; day: string
                 <tr key={c.date}>
                   <td>
                     <a {...linkProps(`${PREFIX}/${name}/${year}?day=${c.date}`)} title="How this day's status changed">
-                      {shortDate(c.date)}
+                      {dayDate(c.date)}
                     </a>
                   </td>
                   <td>{closeText(c)}</td>

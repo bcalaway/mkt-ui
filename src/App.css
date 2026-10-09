@@ -228,3 +228,22 @@ button.tool:hover { color: var(--ink); border-color: var(--ink-2); }
 .month td.early { box-shadow: inset 0 0 0 1.5px var(--accent); font-weight: 600; }
 .month td.projected { outline: 1px dashed var(--muted); outline-offset: -1px; }
 
+
+/* Calendars' "Coming up": calendars as rows, scrolls sideways on a narrow screen. */
+.scroll-x {
+  overflow-x: auto;
+}
+.coming-up th[scope="col"] {
+  white-space: nowrap;
+}
+.coming-up td {
+  min-width: 7rem;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

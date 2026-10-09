@@ -120,7 +120,8 @@ export default function ZoomChart({
         grid: { vertLines: { visible: false }, horzLines: { color: theme.grid } },
         rightPriceScale: { borderColor: theme.axis },
         timeScale: { borderColor: theme.axis, minBarSpacing: 0.05 },
-        localization: { priceFormatter: (v: number) => axisLabel(v, unit) },
+        // Dates are YYYY-MM-DD everywhere (Bill, 2026-10-09), the crosshair's label included.
+        localization: { priceFormatter: (v: number) => axisLabel(v, unit), timeFormatter: (t: Time) => timeToIso(t) },
       };
     };
     const chart: IChartApi = createChart(box.current, { height, autoSize: true, crosshair: { mode: CrosshairMode.Magnet }, ...style() });

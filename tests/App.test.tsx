@@ -186,15 +186,14 @@ describe("App", () => {
     expect(asked).toContain("/api/sources/TD-PRICES?checks=100");
   });
 
-  it("lists calendars with coverage, a day lookup and upcoming closes side by side", async () => {
+  it("lists calendars with coverage, and what's coming up on each", async () => {
     serve();
     window.history.replaceState(null, "", "/calendars?date=2026-10-12");
     render(<App />);
     const link = await screen.findByRole("link", { name: "SIFMA-US" });
     expect(link.getAttribute("href")).toBe("/calendars/SIFMA-US/2026");
     expect(screen.getByText("30 · 7 · 74")).toBeInTheDocument();
-    expect(await screen.findByText("Monday")).toBeInTheDocument();
-    expect(screen.getByText("Business day")).toBeInTheDocument();
+    expect(screen.getByText("2026-10-12 Mon, Columbus Day")).toBeInTheDocument();
     expect((await screen.findAllByText("Closed: Columbus Day")).length).toBeGreaterThan(0);
   });
 
