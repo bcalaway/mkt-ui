@@ -15,7 +15,6 @@ import type { Screen } from "../types";
 
 const PREFIX = "/futures";
 type Product = Schemas["FuturesProductOut"];
-type Detail = Schemas["FuturesProductDetail"];
 type Contract = Schemas["FuturesContractOut"];
 
 export const KIND_LABEL: Record<string, string> = {

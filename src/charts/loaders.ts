@@ -145,7 +145,7 @@ export function withTargetRange(name: string, inner: Loader): Loader {
     const main = loaded.lines[0];
     if (!main) return loaded;
     // A bar's period ends the day before the next bar's date; the last one, today.
-    const ends = main.points.map((p, k) => (k + 1 < main.points.length ? addDays(main.points[k + 1].date, -1) : today()));
+    const ends = main.points.map((_p, k) => (k + 1 < main.points.length ? addDays(main.points[k + 1].date, -1) : today()));
     const bound = (field: string, label: string, slot: number): TimeLine => {
       const values = asOf(fields[field] ?? [], ends);
       return {
