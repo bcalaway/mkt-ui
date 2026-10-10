@@ -195,8 +195,8 @@ describe("App", () => {
     expect(tenor.getAttribute("href")).toBe("/instruments/UST-10Y-CMT");
   });
 
-  it("pages search results 50 at a time", async () => {
-    const matches = Array.from({ length: 120 }, (_, i) => ({
+  it("pages a search with its total, page links, and first, previous, next and last", async () => {
+    const matches = Array.from({ length: 620 }, (_, i) => ({
       name: `EUR${String(i).padStart(3, "0")}-ECB`, aliases: [], tenor: "", description: "ECB rate", status: "active", type: "fx_fixing",
     }));
     vi.stubGlobal(
@@ -204,22 +204,48 @@ describe("App", () => {
       vi.fn((url: string) => {
         const q = new URLSearchParams(url.split("?")[1] ?? "");
         const offset = Number(q.get("offset") ?? 0);
-        const body = url.startsWith("/api/search") ? matches.slice(offset, offset + Number(q.get("limit"))) : [];
-        return Promise.resolve({ ok: true, status: 200, statusText: "", json: () => Promise.resolve(body) });
+        const search = url.startsWith("/api/search");
+        const body = search ? matches.slice(offset, offset + Number(q.get("limit"))) : [];
+        const headers = new Headers(search ? { "X-Total-Count": String(matches.length) } : {});
+        return Promise.resolve({ ok: true, status: 200, statusText: "", headers, json: () => Promise.resolve(body) });
       }),
     );
     window.history.replaceState(null, "", "/instruments?q=ECB");
     render(<App />);
     expect(await screen.findByRole("link", { name: "EUR049-ECB" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "EUR050-ECB" })).toBeNull();
-    expect(screen.getAllByText("1–50, more after")).toHaveLength(2);
-    fireEvent.click(screen.getAllByRole("button", { name: "Next 50" })[0]);
-    expect(await screen.findByRole("link", { name: "EUR050-ECB" })).toBeInTheDocument();
-    fireEvent.click(screen.getAllByRole("button", { name: "Next 50" })[0]);
-    expect(await screen.findByRole("link", { name: "EUR119-ECB" })).toBeInTheDocument();
-    expect(screen.getByText("101–120")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Next 50" })).toBeDisabled();
-    expect(window.location.search).toBe("?q=ECB&start=100");
+    expect(screen.getAllByText("1–50 of 620 instruments")).toHaveLength(2);
+    // Pages 1 to 10 linked, page 1 current; 13 pages in all.
+    expect(screen.getAllByRole("button", { name: "10" })).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "11" })).toBeNull();
+    expect(screen.getAllByRole("button", { name: "1" })[0]).toHaveAttribute("aria-current", "page");
+    expect(screen.getAllByRole("button", { name: "Previous page" })[0]).toBeDisabled();
+    fireEvent.click(screen.getAllByRole("button", { name: "7" })[0]);
+    expect(await screen.findByRole("link", { name: "EUR300-ECB" })).toBeInTheDocument();
+    expect(window.location.search).toBe("?q=ECB&start=300");
+    expect(screen.getAllByText("301–350 of 620 instruments")).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "13" })).toHaveLength(2); // the window moved: pages 4 to 13
+    fireEvent.click(screen.getAllByRole("button", { name: "Last page (13)" })[0]);
+    expect(await screen.findByRole("link", { name: "EUR619-ECB" })).toBeInTheDocument();
+    expect(screen.getByText("601–620 of 620 instruments")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next page" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "First page" }));
+    expect(await screen.findByRole("link", { name: "EUR000-ECB" })).toBeInTheDocument();
+    expect(window.location.search).toBe("?q=ECB");
+  });
+
+  it("pages a type's list the same way", async () => {
+    const cmts = Array.from({ length: 14 }, (_, i) => ({
+      name: `UST-${i + 1}Y-CMT`, aliases: [], tenor: `P${i + 1}Y`, description: "CMT", status: "active", type: "cmt_yield",
+    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve({ ok: true, status: 200, statusText: "", headers: new Headers(), json: () => Promise.resolve(cmts) })),
+    );
+    window.history.replaceState(null, "", "/instruments");
+    render(<App />);
+    expect(await screen.findByText("14 instruments")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Next page" })).toBeNull(); // one page: no page buttons
   });
 
   it("lists Treasury securities on Instruments with coupons, on-the-runs and prices", async () => {
@@ -231,7 +257,7 @@ describe("App", () => {
     expect(screen.getByText("4.25%")).toBeInTheDocument();
     expect(screen.getByText("10Y")).toBeInTheDocument(); // the on-the-run badge; the issued variant isn't shown
     expect(screen.getByText("99.978944")).toBeInTheDocument();
-    expect(screen.getByText("2 securities.")).toBeInTheDocument();
+    expect(screen.getByText("2 securities")).toBeInTheDocument();
   });
 
   it("sends the old Treasuries screen's links to Instruments", async () => {

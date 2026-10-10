@@ -11,6 +11,7 @@ import { OPEN_ON_DAYS, PRESETS } from "../../charts/presets";
 import { isOhlc } from "../../charts/StyleChips";
 import ZoomChart from "../../charts/ZoomChart";
 import { linkProps, useLocation } from "../../router";
+import Pager, { PAGE_SIZE } from "../../Pager";
 import { CalendarLink, SourceLink } from "../../links";
 
 const PREFIX = "/instruments";
@@ -34,7 +35,7 @@ function couponText(r: Row): string {
 }
 
 /** Treasury securities of one kind (or every kind, `ust`), outstanding or with matured ones too. */
-export function TreasuryList({ type, all }: { type: string; all: boolean }) {
+export function TreasuryList({ type, all, start, onGo }: { type: string; all: boolean; start: number; onGo: (start: number) => void }) {
   const kind = type === "ust" ? "" : type;
   const [data, setData] = useState<Schemas["SecurityListResponse"] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -44,13 +45,13 @@ export function TreasuryList({ type, all }: { type: string; all: boolean }) {
     setData(null);
     setError(null);
     apiGet("/api/securities", {
-      query: { type: (kind || undefined) as Row["type"] | undefined, include_inactive: all || undefined, limit: all ? 6000 : 1000 },
+      query: { type: (kind || undefined) as Row["type"] | undefined, include_inactive: all || undefined, limit: PAGE_SIZE, offset: start },
       signal: ctl.signal,
     })
       .then(setData)
       .catch((e: Error) => e.name !== "AbortError" && setError(e.message));
     return () => ctl.abort();
-  }, [kind, all]);
+  }, [kind, all, start]);
 
   return (
     <>
@@ -58,9 +59,7 @@ export function TreasuryList({ type, all }: { type: string; all: boolean }) {
       {!error && !data && <p className="muted">Loading…</p>}
       {data && (
         <>
-          <p className="muted">
-            {data.securities.length === data.total ? `${data.total} securities` : `${data.securities.length} of ${data.total} securities`}.
-          </p>
+          <Pager start={start} total={data.total} shown={data.securities.length} noun="securities" onGo={onGo} />
           <table className="data">
             <thead>
               <tr>
@@ -105,6 +104,7 @@ export function TreasuryList({ type, all }: { type: string; all: boolean }) {
               ))}
             </tbody>
           </table>
+          {data.securities.length > 20 && <Pager start={start} total={data.total} shown={data.securities.length} noun="securities" onGo={onGo} />}
         </>
       )}
     </>

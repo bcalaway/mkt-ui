@@ -254,3 +254,9 @@ button.tool:hover { color: var(--ink); border-color: var(--ink-2); }
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+
+/* Paging (src/Pager.tsx): the count, then the page buttons. */
+.pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; margin: 0.5rem 0; }
+.pager-links { display: flex; flex-wrap: wrap; gap: 4px; }
+.pager-links button.tool { min-width: 2rem; justify-content: center; }
+.pager-links button.tool[aria-current="page"] { background: var(--ink); border-color: var(--ink); color: var(--surface); }

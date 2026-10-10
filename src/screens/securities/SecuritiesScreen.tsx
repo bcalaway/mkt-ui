@@ -12,6 +12,7 @@ import { OPEN_ON_DAYS, PRESETS } from "../../charts/presets";
 import { isOhlc } from "../../charts/StyleChips";
 import ZoomChart from "../../charts/ZoomChart";
 import { SOURCE_LABEL, instrumentType, tenorLabel } from "../../format";
+import Pager, { PAGE_SIZE } from "../../Pager";
 import { linkProps, useLocation, useQueryUpdater, type Location } from "../../router";
 import { CalendarLink, SourceLink } from "../../links";
 import type { Screen } from "../types";
@@ -37,9 +38,6 @@ const TYPES: { key: string; label: string }[] = [
   { key: "frn", label: "FRNs" },
 ];
 
-// Search results a page at a time: ask for one more than a page, so a match past it says there's a next one.
-const PAGE = 50;
-
 const SCHEME_LABEL: Record<string, string> = {
   "UST-PAR": "Treasury par curve",
   "H15-TCM": "Fed H.15",
@@ -51,38 +49,36 @@ function ListPage({ query, type, all, start }: { query: string; type: string; al
   const treasuries = !query && TREASURY_TYPES.includes(type);
   const [text, setText] = useState(query);
   const [rows, setRows] = useState<InstrumentSummary[] | null>(null);
+  const [total, setTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (treasuries) return; // TreasuryList loads its own
     const ctl = new AbortController();
     setError(null);
+    // A search is paged by secmaster-svc (X-Total-Count says how many in all); the CMT and fixing lists are
+    // short, so they come whole and are paged here, the same way.
     const req = query
-      ? apiGet("/api/search", { query: { q: query, limit: PAGE + 1, offset: start }, signal: ctl.signal })
-      : type === "fixing"
-        ? Promise.all(FIXING_TYPES.map((t) => apiGet("/api/instruments", { query: { type: t }, signal: ctl.signal }))).then(
-            (lists) => lists.flat(),
-          )
-        : apiGet("/api/instruments", { query: { type: "cmt_yield" }, signal: ctl.signal });
+      ? apiGet("/api/search", {
+          query: { q: query, limit: PAGE_SIZE, offset: start },
+          signal: ctl.signal,
+          onResponse: (res) => setTotal(Number(res.headers?.get("X-Total-Count") ?? 0)),
+        })
+      : (type === "fixing"
+          ? Promise.all(FIXING_TYPES.map((t) => apiGet("/api/instruments", { query: { type: t }, signal: ctl.signal }))).then(
+              (lists) => lists.flat(),
+            )
+          : apiGet("/api/instruments", { query: { type: "cmt_yield" }, signal: ctl.signal })
+        ).then((all) => {
+          setTotal(all.length);
+          return all.slice(start, start + PAGE_SIZE);
+        });
     req.then(setRows).catch((e: Error) => e.name !== "AbortError" && setError(e.message));
     return () => ctl.abort();
   }, [query, treasuries, start, type]);
-  const more = !!query && !!rows && rows.length > PAGE;
-  const shown = query && rows ? rows.slice(0, PAGE) : rows;
-  const pager = query && rows && (start > 0 || more) && (
-    <nav className="controls" aria-label="Pages">
-      <button type="button" disabled={start === 0} onClick={() => setQuery({ start: start > PAGE ? String(start - PAGE) : null })}>
-        Previous {PAGE}
-      </button>
-      <span className="muted">
-        {shown && shown.length > 0 ? `${start + 1}–${start + shown.length}` : "None"}
-        {more ? ", more after" : ""}
-      </span>
-      <button type="button" disabled={!more} onClick={() => setQuery({ start: String(start + PAGE) })}>
-        Next {PAGE}
-      </button>
-    </nav>
-  );
+  const shown = rows;
+  const onGo = (to: number) => setQuery({ start: to ? String(to) : null });
+  const pager = rows && <Pager start={start} total={Math.max(total, start + rows.length)} shown={rows.length} noun="instruments" onGo={onGo} />;
 
   return (
     <section>
@@ -110,7 +106,7 @@ function ListPage({ query, type, all, start }: { query: string; type: string; al
         ))}
         {treasuries && (
           <label>
-            <input type="checkbox" checked={all} onChange={(e) => setQuery({ all: e.target.checked ? "1" : null })} />
+            <input type="checkbox" checked={all} onChange={(e) => setQuery({ all: e.target.checked ? "1" : null, start: null })} />
             Include matured
           </label>
         )}
@@ -134,7 +130,7 @@ function ListPage({ query, type, all, start }: { query: string; type: string; al
           </button>
         )}
       </form>
-      {treasuries && <TreasuryList type={type} all={all} />}
+      {treasuries && <TreasuryList type={type} all={all} start={start} onGo={(to) => setQuery({ start: to ? String(to) : null })} />}
       {!treasuries && error && <p className="error">Couldn't load instruments: {error}</p>}
       {!treasuries && !error && !rows && <p className="muted">Loading…</p>}
       {!treasuries && rows && rows.length === 0 && start === 0 && <p className="muted">Nothing matches “{query}”. Try a tenor like 10Y or a source key like BC_10YEAR.</p>}
@@ -165,7 +161,7 @@ function ListPage({ query, type, all, start }: { query: string; type: string; al
           </tbody>
         </table>
       )}
-      {!treasuries && shown && shown.length > 20 && pager}
+      {!treasuries && shown && shown.length > 20 && total > PAGE_SIZE && pager}
     </section>
   );
 }
