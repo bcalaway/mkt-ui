@@ -4,9 +4,10 @@ import { seriesScreen } from "./series/SeriesScreen";
 import { securitiesScreen } from "./securities/SecuritiesScreen";
 import { sourcesScreen } from "./sources/SourcesScreen";
 import { calendarsScreen } from "./calendars/CalendarsScreen";
+import { futuresScreen } from "./futures/FuturesScreen";
 
 // The nav order; the first is the home page.
-export const screens: Screen[] = [curveScreen, seriesScreen, securitiesScreen, calendarsScreen, sourcesScreen];
+export const screens: Screen[] = [curveScreen, seriesScreen, securitiesScreen, futuresScreen, calendarsScreen, sourcesScreen];
 
 export function screenFor(path: string): Screen {
   return screens.find((s) => s.matches(path)) ?? screens[0];

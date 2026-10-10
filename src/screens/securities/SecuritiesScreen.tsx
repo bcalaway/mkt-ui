@@ -254,6 +254,11 @@ function DetailPage({ name }: { name: string }) {
               {inst.description}
               {inst.aliases.length > 0 && <>, also {inst.aliases.join(", ")}</>}.
             </p>
+            {inst.type === "fut_product" && (
+              <p>
+                <a {...linkProps(`/futures/${encodeURIComponent(inst.name)}`)}>Its contracts, generics and positioning</a>
+              </p>
+            )}
           </header>
           {inst.latest && (
             <p className="figure">
