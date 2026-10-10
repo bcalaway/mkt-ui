@@ -111,8 +111,8 @@ export default function CurveChart({ tenors, lines, height = 380 }: { tenors: st
 
   return (
     <div className="chart chart-frame">
-      <div ref={box} style={{ height }} />
       <ChartToolbar onAll={() => showAllTenors(chartRef.current)} />
+      <div ref={box} style={{ height }} />
     </div>
   );
 }

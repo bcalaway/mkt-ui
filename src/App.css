@@ -114,7 +114,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 .tooltip {
   position: absolute;
-  top: 12px;
+  top: 48px; /* under the toolbar row */
   z-index: 2;
   min-width: 12rem;
   padding: 0.5rem 0.75rem;
@@ -183,15 +183,17 @@ table.capture-text td:first-child { width: 4rem; }
 }
 
 .chart-note { font-size: 0.875rem; margin: 0.25rem 0 0.75rem; }
-.chart-error { position: absolute; top: 0.5rem; left: 0.75rem; margin: 0; }
+.chart-error { position: absolute; top: 48px; left: 0.75rem; margin: 0; }
 
+/* A row of its own above the plot (2026-10-10): drawn over the plot's top-right corner, the buttons covered
+   the value axis's labels. */
 .chart-toolbar {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 3;
   display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--rule);
 }
 button.tool {
   background: var(--surface);
