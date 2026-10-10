@@ -261,6 +261,40 @@ export function TreasuryDetail({ name }: { name: string }) {
             </table>
           </details>
 
+          {d.deliverable_into.length > 0 && (
+            <>
+              <h2>Deliverable into</h2>
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th scope="col">Contract</th>
+                    <th scope="col">Month</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Conversion factor</th>
+                    <th scope="col">Months</th>
+                    <th scope="col">Joined</th>
+                    <th scope="col">Last delivery</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {d.deliverable_into.map((c) => (
+                    <tr key={c.contract}>
+                      <td>
+                        <a {...linkProps(`/futures/${encodeURIComponent(c.product)}/${encodeURIComponent(c.contract)}`)} title="Its deliverable basket">{c.contract}</a>
+                      </td>
+                      <td>{c.month}</td>
+                      <td>{c.status}</td>
+                      <td>{c.conversion_factor}</td>
+                      <td>{c.remaining_months}</td>
+                      <td>{c.joined}</td>
+                      <td>{c.last_delivery_date}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+
           <h2>Auctions</h2>
           <table className="data">
             <thead>

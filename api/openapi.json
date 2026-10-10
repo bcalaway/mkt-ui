@@ -314,6 +314,14 @@
             "title": "Month",
             "type": "string"
           },
+          "outstanding_total": {
+            "title": "Outstanding Total",
+            "type": "string"
+          },
+          "outstanding_total_display": {
+            "title": "Outstanding Total Display",
+            "type": "string"
+          },
           "product": {
             "title": "Product",
             "type": "string"
@@ -325,6 +333,14 @@
           "status": {
             "title": "Status",
             "type": "string"
+          },
+          "unstripped_total": {
+            "title": "Unstripped Total",
+            "type": "string"
+          },
+          "unstripped_total_display": {
+            "title": "Unstripped Total Display",
+            "type": "string"
           }
         },
         "required": [
@@ -333,7 +349,11 @@
           "month",
           "status",
           "rule",
-          "deliverables"
+          "deliverables",
+          "outstanding_total",
+          "outstanding_total_display",
+          "unstripped_total",
+          "unstripped_total_display"
         ],
         "title": "BasketOut",
         "type": "object"
@@ -885,6 +905,54 @@
         "title": "DayVersionOut",
         "type": "object"
       },
+      "DeliverableIntoOut": {
+        "properties": {
+          "contract": {
+            "title": "Contract",
+            "type": "string"
+          },
+          "conversion_factor": {
+            "title": "Conversion Factor",
+            "type": "string"
+          },
+          "joined": {
+            "title": "Joined",
+            "type": "string"
+          },
+          "last_delivery_date": {
+            "title": "Last Delivery Date",
+            "type": "string"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "product": {
+            "title": "Product",
+            "type": "string"
+          },
+          "remaining_months": {
+            "title": "Remaining Months",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "contract",
+          "product",
+          "month",
+          "status",
+          "conversion_factor",
+          "remaining_months",
+          "joined",
+          "last_delivery_date"
+        ],
+        "title": "DeliverableIntoOut",
+        "type": "object"
+      },
       "DeliverableOut": {
         "properties": {
           "conversion_factor": {
@@ -907,8 +975,24 @@
             "title": "Issue Date",
             "type": "string"
           },
+          "joined": {
+            "title": "Joined",
+            "type": "string"
+          },
           "maturity_date": {
             "title": "Maturity Date",
+            "type": "string"
+          },
+          "outstanding": {
+            "title": "Outstanding",
+            "type": "string"
+          },
+          "outstanding_as_of": {
+            "title": "Outstanding As Of",
+            "type": "string"
+          },
+          "outstanding_display": {
+            "title": "Outstanding Display",
             "type": "string"
           },
           "remaining_months": {
@@ -917,6 +1001,14 @@
           },
           "security": {
             "title": "Security",
+            "type": "string"
+          },
+          "unstripped": {
+            "title": "Unstripped",
+            "type": "string"
+          },
+          "unstripped_display": {
+            "title": "Unstripped Display",
             "type": "string"
           }
         },
@@ -928,7 +1020,13 @@
           "maturity_date",
           "issue_date",
           "conversion_factor",
-          "remaining_months"
+          "remaining_months",
+          "joined",
+          "outstanding",
+          "outstanding_display",
+          "unstripped",
+          "unstripped_display",
+          "outstanding_as_of"
         ],
         "title": "DeliverableOut",
         "type": "object"
@@ -1774,6 +1872,13 @@
             "title": "Checks",
             "type": "array"
           },
+          "deliverable_into": {
+            "items": {
+              "$ref": "#/components/schemas/DeliverableIntoOut"
+            },
+            "title": "Deliverable Into",
+            "type": "array"
+          },
           "description": {
             "title": "Description",
             "type": "string"
@@ -1871,7 +1976,8 @@
           "on_the_run",
           "index_ratio",
           "strip",
-          "price"
+          "price",
+          "deliverable_into"
         ],
         "title": "SecurityDetail",
         "type": "object"
