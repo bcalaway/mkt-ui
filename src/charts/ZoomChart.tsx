@@ -29,6 +29,7 @@ import {
 } from "lightweight-charts";
 import { addDays, daysBetween, periodStart, pickInterval, type Interval } from "./bars";
 import ChartToolbar, { type Preset } from "./ChartToolbar";
+import { StyleToggle } from "./StyleChips";
 import { useChartTheme } from "./theme";
 import type { ChartEvent, TimeLine } from "./types";
 
@@ -78,6 +79,7 @@ export default function ZoomChart({
   presets = [],
   initialDays = null,
   events = NO_EVENTS,
+  styleToggle = false,
 }: {
   loader: Loader;
   first: string; // the earliest date there could be data for
@@ -89,6 +91,7 @@ export default function ZoomChart({
   presets?: Preset[];
   initialDays?: number | null; // open on the last n days; null opens on all of history
   events?: ChartEvent[]; // marked on the lines they're about, and named in the tooltip
+  styleToggle?: boolean; // the lines/OHLC toggle in the toolbar (it sets ?style=, which the screen reads for `bars`)
 }) {
   const theme = useChartTheme();
   const box = useRef<HTMLDivElement>(null);
@@ -327,7 +330,12 @@ export default function ZoomChart({
 
   return (
     <div className="chart" style={{ position: "relative" }}>
-      <ChartToolbar onAll={() => engine.current?.reset()} presets={presets} onPreset={(p) => engine.current?.showLast(p.days)} />
+      <ChartToolbar
+        onAll={() => engine.current?.reset()}
+        presets={presets}
+        onPreset={(p) => engine.current?.showLast(p.days)}
+        start={styleToggle ? <StyleToggle ohlc={bars} /> : undefined}
+      />
       <div ref={box} style={{ height }} />
       {error && <p className="error chart-error">Couldn't load: {error}</p>}
       {hover && (

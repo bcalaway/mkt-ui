@@ -4,7 +4,18 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 // Charts draw on canvas/SVG measurements jsdom doesn't have: stand-ins here.
 vi.mock("../src/charts/CurveChart", () => ({ default: () => <div>curve chart</div> }));
-vi.mock("../src/charts/ZoomChart", () => ({ default: () => <div>series chart</div> }));
+// The lines/OHLC toggle is in the chart's own toolbar, so the stand-in keeps it.
+vi.mock("../src/charts/ZoomChart", async () => {
+  const { StyleToggle } = await import("../src/charts/StyleChips");
+  return {
+    default: (p: { styleToggle?: boolean; bars?: boolean }) => (
+      <div>
+        series chart
+        {p.styleToggle && <StyleToggle ohlc={!!p.bars} />}
+      </div>
+    ),
+  };
+});
 
 import App from "../src/App";
 
