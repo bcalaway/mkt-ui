@@ -259,8 +259,9 @@ describe("App", () => {
     serve();
     window.history.replaceState(null, "", "/calendars?date=2026-10-12");
     render(<App />);
-    const link = await screen.findByRole("link", { name: "SIFMA-US" });
-    expect(link.getAttribute("href")).toBe("/calendars/SIFMA-US/2026");
+    // Linked twice: the coverage table and the Coming up table.
+    const links = await screen.findAllByRole("link", { name: "SIFMA-US" });
+    expect(links.map((l) => l.getAttribute("href"))).toEqual(["/calendars/SIFMA-US/2026", "/calendars/SIFMA-US/2026"]);
     expect(screen.getByText("30 · 7 · 74")).toBeInTheDocument();
     expect(screen.getByText("2026-10-12 Mon, Columbus Day")).toBeInTheDocument();
     expect((await screen.findAllByText("Closed: Columbus Day")).length).toBeGreaterThan(0);
