@@ -327,8 +327,8 @@ export default function ZoomChart({
 
   return (
     <div className="chart" style={{ position: "relative" }}>
-      <div ref={box} style={{ height }} />
       <ChartToolbar onAll={() => engine.current?.reset()} presets={presets} onPreset={(p) => engine.current?.showLast(p.days)} />
+      <div ref={box} style={{ height }} />
       {error && <p className="error chart-error">Couldn't load: {error}</p>}
       {hover && (
         <div className="tooltip" style={{ left: Math.max(8, hover.x + 16) }} role="status">
