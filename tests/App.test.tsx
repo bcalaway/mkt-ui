@@ -105,6 +105,8 @@ const ANSWERS: Record<string, unknown> = {
     type: "ust_note", identifiers: [], terms: { maturity_date: "2035-08-15" }, provenance: {}, checks: [], auctions: [],
     on_the_run: [], index_ratio: null, strip: null,
     price: { date: "2026-10-06", value: "99.828125", display: "99.828125", source: "TD-PRICES" },
+    deliverable_into: [{ contract: "TYZ26", product: "TY", month: "2026-12", status: "listed", conversion_factor: "0.8732",
+      remaining_months: 104, joined: "2025-08-15", last_delivery_date: "2026-12-31" }],
   },
   "/api/curve": {
     curves: [
@@ -324,6 +326,15 @@ describe("App", () => {
     fireEvent.click(bars);
     expect(window.location.search).toBe("?style=ohlc");
     expect(await screen.findByRole("button", { name: "OHLC bars" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("lists the futures contracts a security is deliverable into, each linked to its basket", async () => {
+    serve();
+    window.history.replaceState(null, "", "/instruments/UST-4.25-2035-08-15");
+    render(<App />);
+    expect(await screen.findByRole("heading", { name: "Deliverable into" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "TYZ26" })).toHaveAttribute("href", "/futures/TY/TYZ26");
+    expect(screen.getByText("0.8732")).toBeInTheDocument();
   });
 
   it("charts a fixing in its own unit", async () => {

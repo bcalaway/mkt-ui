@@ -29,7 +29,11 @@ const ANSWERS: Record<string, unknown> = {
   "/api/futures/contracts/TYZ26/basket": {
     contract: "TYZ26", product: "TY", month: "2026-12", status: "listed", rule: "6.5y-10y",
     deliverables: [{ security: "UST-4.25-2035-08-15", cusip: "91282CNC1", coupon: "0.0425", coupon_display: "4.25",
-      maturity_date: "2035-08-15", issue_date: "2025-08-15", conversion_factor: "0.8732", remaining_months: 104 }],
+      maturity_date: "2035-08-15", issue_date: "2025-08-15", conversion_factor: "0.8732", remaining_months: 104,
+      joined: "2025-08-15", outstanding: "126500000000", outstanding_display: "126.5", unstripped: "121040000000",
+      unstripped_display: "121.0", outstanding_as_of: "2026-09-30" }],
+    outstanding_total: "126500000000", outstanding_total_display: "126.5", unstripped_total: "121040000000",
+    unstripped_total_display: "121.0",
   },
   "/api/sources": { sources: [] },
 };
@@ -88,5 +92,16 @@ describe("Futures", () => {
     expect(await screen.findByText("0.8732")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "UST-4.25-2035-08-15" })).toHaveAttribute("href", "/instruments/UST-4.25-2035-08-15");
     expect(screen.getByText("4.25%")).toBeInTheDocument();
+  });
+
+  it("shows each deliverable's amount outstanding as given, its join date and the basket's total", async () => {
+    serve();
+    window.history.replaceState(null, "", "/futures/TY/TYZ26");
+    render(<App />);
+    expect(await screen.findAllByText("126.5")).toHaveLength(2); // the security and the total
+    expect(screen.getAllByText("121.0")).toHaveLength(2);
+    expect(screen.getByRole("rowheader", { name: "Total" })).toBeInTheDocument();
+    expect(screen.getByText(/as of 2026-09-30, in \$ billions/)).toBeInTheDocument();
+    expect(screen.getAllByText("2025-08-15")).toHaveLength(2); // issued and joined
   });
 });

@@ -276,6 +276,8 @@ function Positioning({ root, who, source }: { root: string; who: string; source:
 
 function BasketPage({ root, contract }: { root: string; contract: string }) {
   const { data, error } = useApi((signal) => apiGet("/api/futures/contracts/{contract}/basket", { path: { contract }, signal }), [contract]);
+  // The latest MSPD month among the deliverables (ISO dates compare as strings); a new issue has none yet.
+  const asOf = data ? data.deliverables.reduce((m, d) => (d.outstanding_as_of > m ? d.outstanding_as_of : m), "") : "";
   return (
     <section>
       <header>
@@ -286,6 +288,7 @@ function BasketPage({ root, contract }: { root: string; contract: string }) {
         {data && (
           <p className="lede">
             {data.deliverables.length} deliverable securities for {data.month} ({data.status}): {data.rule}.
+            {asOf && <> Amounts outstanding from <SourceLink name="FD-MSPD-STRIPS" label="MSPD" /> as of {asOf}, in $ billions.</>}
           </p>
         )}
       </header>
@@ -300,8 +303,11 @@ function BasketPage({ root, contract }: { root: string; contract: string }) {
               <th scope="col">Coupon</th>
               <th scope="col">Maturity</th>
               <th scope="col">Issued</th>
+              <th scope="col">Joined</th>
               <th scope="col">Months</th>
               <th scope="col">Conversion factor</th>
+              <th scope="col">Outstanding</th>
+              <th scope="col">Unstripped</th>
             </tr>
           </thead>
           <tbody>
@@ -312,11 +318,23 @@ function BasketPage({ root, contract }: { root: string; contract: string }) {
                 <td>{d.coupon_display ? `${d.coupon_display}%` : ""}</td>
                 <td>{d.maturity_date}</td>
                 <td>{d.issue_date}</td>
+                <td>{d.joined}</td>
                 <td>{d.remaining_months}</td>
                 <td>{d.conversion_factor}</td>
+                <td className="num" title={d.outstanding ? `$${d.outstanding} on ${d.outstanding_as_of}` : "Not in MSPD yet"}>{d.outstanding_display || <span className="muted">—</span>}</td>
+                <td className="num">{d.unstripped_display || <span className="muted">—</span>}</td>
               </tr>
             ))}
           </tbody>
+          {data.outstanding_total && (
+            <tfoot>
+              <tr>
+                <th scope="row" colSpan={8}>Total</th>
+                <td className="num">{data.outstanding_total_display}</td>
+                <td className="num">{data.unstripped_total_display}</td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       )}
     </section>
