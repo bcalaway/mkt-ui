@@ -326,6 +326,39 @@ describe("App", () => {
     expect(await screen.findByRole("button", { name: "OHLC bars" })).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("charts a fixing in its own unit", async () => {
+    const pages: Record<string, unknown> = {
+      "/api/instruments/SOFR": {
+        name: "SOFR", aliases: [], tenor: "", description: "Secured Overnight Financing Rate", status: "active", type: "rate_fixing",
+        curve: "", currency: "USD", country: "US", calendar: "SIFMA-US", identifiers: [], notes: [], unit: "%",
+        latest: { date: "2026-10-08", value: "0.0388", display: "3.88", source: "NYFED-SOFR" },
+      },
+      "/api/instruments/USDJPY-H10": {
+        name: "USDJPY-H10", aliases: [], tenor: "", description: "Yen per dollar", status: "active", type: "fx_fixing",
+        curve: "", currency: "JPY", country: "US", calendar: "FED", identifiers: [], notes: [], unit: "value",
+        latest: { date: "2026-10-02", value: "157.8100", display: "157.8100", source: "FRB-H10-RATES" },
+      },
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        const body = pages[url.split("?")[0]] ?? { sources: [] };
+        return Promise.resolve({ ok: true, status: 200, statusText: "", headers: new Headers(), json: () => Promise.resolve(body) });
+      }),
+    );
+    window.history.replaceState(null, "", "/instruments/SOFR");
+    const { unmount } = render(<App />);
+    expect(await screen.findByRole("heading", { name: "Rate" })).toBeInTheDocument();
+    expect(screen.getByText("3.88%")).toBeInTheDocument();
+    expect(screen.getByText("series chart")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "See it over time" })).toBeNull(); // Over time is for the curve's yields
+    unmount();
+    window.history.replaceState(null, "", "/instruments/USDJPY-H10");
+    render(<App />);
+    expect(await screen.findByText("157.8100")).toBeInTheDocument(); // as H.10 printed it, no percent sign
+    expect(screen.getByRole("heading", { name: "Rate" })).toBeInTheDocument();
+  });
+
   it("charts a CMT's yield with the same controls", async () => {
     serve();
     window.history.replaceState(null, "", "/instruments/UST-10Y-CMT");
