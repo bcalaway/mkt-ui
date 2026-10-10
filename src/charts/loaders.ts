@@ -5,8 +5,8 @@
 // and retired (Bill, 2026-10-06). Each loader reports every request it makes
 // (bytes, and time split into mkt-api's, quote-svc's and the network's, from
 // Server-Timing).
-import type { Bar, BarSeries } from "../api/client";
-import type { Interval } from "./bars";
+import { apiGet, type Bar, type BarSeries } from "../api/client";
+import { addDays, type Interval } from "./bars";
 import { blockRange, blocksCovering, getBlock, prefetchAround, type BlockStat } from "./blocks";
 import type { TimeLine } from "./types";
 import type { Loader } from "./ZoomChart";
@@ -113,4 +113,49 @@ export function fixingLoader(name: string, unit: string, record: Recorder): Load
     slot: 0,
     points: s.bars.map((b) => point(b, unit === "%" ? "%" : "", interval, SOURCE_LABEL[b.source] ?? b.source)),
   }), FIXINGS_FIRST_DAY, today());
+}
+
+/** The latest value on or before each date, from points sorted by date. */
+export function asOf(points: { date: string; display: string }[], dates: string[]): (string | null)[] {
+  let k = -1;
+  return dates.map((d) => {
+    while (k + 1 < points.length && points[k + 1].date <= d) k++;
+    return k >= 0 ? points[k].display : null;
+  });
+}
+
+type Fields = Record<string, { date: string; display: string }[]>;
+const rangeCache = new Map<string, Promise<Fields>>();
+
+/**
+ * A rate fixing with its target range drawn around it (EFFR: Bill, 2026-10-09), from
+ * /api/instruments/{name}/fields, fetched once. Each bound is plotted at the fixing's own dates (the
+ * bound in force at the end of each bar's period), so a monthly chart has monthly bounds.
+ */
+export function withTargetRange(name: string, inner: Loader): Loader {
+  return async (interval, from, to) => {
+    let got = rangeCache.get(name);
+    if (!got) {
+      got = apiGet("/api/instruments/{name}/fields", { path: { name }, query: { field: ["target_low", "target_high"] } })
+        .then((r) => r.fields);
+      got.catch(() => rangeCache.delete(name));
+      rangeCache.set(name, got);
+    }
+    const [loaded, fields] = await Promise.all([inner(interval, from, to), got.catch((): Fields => ({}))]);
+    const main = loaded.lines[0];
+    if (!main) return loaded;
+    // A bar's period ends the day before the next bar's date; the last one, today.
+    const ends = main.points.map((_p, k) => (k + 1 < main.points.length ? addDays(main.points[k + 1].date, -1) : today()));
+    const bound = (field: string, label: string, slot: number): TimeLine => {
+      const values = asOf(fields[field] ?? [], ends);
+      return {
+        key: field,
+        label,
+        slot,
+        points: main.points.flatMap((p, k) => (values[k] === null ? [] : [{ date: p.date, plot: Number(values[k]), text: `${values[k]}%` }])),
+      };
+    };
+    const lines = [main, bound("target_high", "Target, upper", 1), bound("target_low", "Target, lower", 2)];
+    return { ...loaded, lines: lines.filter((l) => l.points.length) };
+  };
 }

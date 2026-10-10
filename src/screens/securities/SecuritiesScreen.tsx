@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ApiError, apiGet, type InstrumentDetail, type InstrumentSummary } from "../../api/client";
 import LoadStats, { useLoadStats } from "../../charts/LoadStats";
-import { FIRST_DAY, FIXINGS_FIRST_DAY, fixingLoader, seriesLoader } from "../../charts/loaders";
+import { FIRST_DAY, FIXINGS_FIRST_DAY, fixingLoader, seriesLoader, withTargetRange } from "../../charts/loaders";
 import { OPEN_ON_DAYS, PRESETS } from "../../charts/presets";
 import { isOhlc } from "../../charts/StyleChips";
 import ZoomChart from "../../charts/ZoomChart";
@@ -198,7 +198,10 @@ function FixingHistory({ name, unit, heading }: { name: string; unit: string; he
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const ohlc = isOhlc(useLocation());
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const loader = useMemo(() => fixingLoader(name, unit, stats.record), [name, unit]);
+  const loader = useMemo(() => {
+    const fixing = fixingLoader(name, unit, stats.record);
+    return name === "EFFR" ? withTargetRange(name, fixing) : fixing; // drawn inside its target range
+  }, [name, unit]);
   return (
     <>
       <h2>{heading}</h2>
@@ -254,6 +257,11 @@ function DetailPage({ name }: { name: string }) {
               {inst.description}
               {inst.aliases.length > 0 && <>, also {inst.aliases.join(", ")}</>}.
             </p>
+            {inst.type === "fut_product" && (
+              <p>
+                <a {...linkProps(`/futures/${encodeURIComponent(inst.name)}`)}>Its contracts, generics and positioning</a>
+              </p>
+            )}
           </header>
           {inst.latest && (
             <p className="figure">
