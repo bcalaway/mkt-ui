@@ -11,6 +11,7 @@ import { OPEN_ON_DAYS, PRESETS } from "../../charts/presets";
 import StyleChips, { isOhlc } from "../../charts/StyleChips";
 import ZoomChart from "../../charts/ZoomChart";
 import { linkProps, useLocation } from "../../router";
+import { CalendarLink, SourceLink } from "../../links";
 
 const PREFIX = "/instruments";
 type Row = Schemas["SecurityRow"];
@@ -147,6 +148,11 @@ const AUCTION_COLUMNS: [string, string][] = [
   ["price_per_100", "Price per 100"],
 ];
 
+/** A term's value as shown: the calendar links to Calendars. */
+function termValue(key: string, value: string) {
+  return key === "calendar" ? <CalendarLink name={value} /> : value;
+}
+
 /** Money in dollars as Treasury prints it, grouped: "42000000000" -> "42,000,000,000"; anything else as given. */
 function amount(v: string): string {
   return /^\d+(\.0+)?$/.test(v) ? v.replace(/\.0+$/, "").replace(/\B(?=(\d{3})+(?!\d))/g, ",") : v;
@@ -198,7 +204,7 @@ export function TreasuryDetail({ name }: { name: string }) {
           {d.price && (
             <p className="figure">
               <span className="figure-value">{d.price.display}</span>
-              <span className="figure-note">per 100, FedInvest's end of day on {d.price.date}.</span>
+              <span className="figure-note">per 100, <SourceLink name="TD-PRICES" label="FedInvest" />'s end of day on {d.price.date}.</span>
             </p>
           )}
           {d.index_ratio && (
@@ -233,7 +239,7 @@ export function TreasuryDetail({ name }: { name: string }) {
             {MAIN_TERMS.filter(([k]) => d.terms[k]).map(([k, label]) => (
               <div key={k} className="fact" title={d.provenance[k] ?? ""}>
                 <dt>{label}</dt>
-                <dd>{d.terms[k]}</dd>
+                <dd>{termValue(k, d.terms[k])}</dd>
               </div>
             ))}
           </dl>
@@ -249,7 +255,7 @@ export function TreasuryDetail({ name }: { name: string }) {
                   .map((k) => (
                     <tr key={k}>
                       <th scope="row">{k}</th>
-                      <td>{d.terms[k] || <span className="muted">—</span>}</td>
+                      <td>{d.terms[k] ? termValue(k, d.terms[k]) : <span className="muted">—</span>}</td>
                       <td className="muted">{d.provenance[k] ?? ""}</td>
                     </tr>
                   ))}
@@ -293,7 +299,7 @@ export function TreasuryDetail({ name }: { name: string }) {
             <tbody>
               {d.identifiers.map((i) => (
                 <tr key={`${i.scheme}:${i.value}:${i.valid_from ?? ""}`}>
-                  <td>{i.scheme}</td>
+                  <td><SourceLink name={i.scheme} /></td>
                   <td>
                     <code>{i.value}</code>
                   </td>

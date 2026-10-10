@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react";
 import { ApiError, apiGet, type Schemas } from "../../api/client";
 import { linkProps, useQueryUpdater, type Location } from "../../router";
+import { CalendarLink, SourceLink } from "../../links";
 import type { Screen } from "../types";
 
 const PREFIX = "/calendars";
@@ -120,7 +121,7 @@ function ComingUpTable({ list, on }: { list: Calendars; on: string }) {
             const p = picked.get(c.name);
             return (
               <tr key={c.name}>
-                <th scope="row">{c.name}</th>
+                <th scope="row"><CalendarLink name={c.name} /></th>
                 {days.map((d) => {
                   const x = byDay.get(d)?.[c.name];
                   const covered = Number(d.slice(0, 4)) >= c.first_year && Number(d.slice(0, 4)) <= c.last_year;
@@ -310,7 +311,7 @@ function DayHistoryPanel({ name, day }: { name: string; day: string }) {
                 <td className="muted">{v.valid_from.slice(0, 10)}</td>
                 <td className={v.valid_to ? "muted" : undefined}>{v.valid_to ? v.valid_to.slice(0, 10) : "Now"}</td>
                 <td>{closeText({ date: day, status: v.status, holiday: v.holiday, close_time: v.close_time, projected: false, source: v.source })}</td>
-                <td>{v.source}</td>
+                <td><SourceLink name={v.source} /></td>
                 <td className="num">#{v.capture_id}</td>
               </tr>
             ))}
@@ -381,7 +382,7 @@ function DisagreementsPanel({ name, year }: { name: string; year: number }) {
                       {d.decided_by || <span className="muted">—</span>}
                       {!d.decided_by_higher && d.decided_by && <span className="badge status-error">lower source</span>}
                     </td>
-                    <td>{d.source}</td>
+                    <td><SourceLink name={d.source} /></td>
                     <td>
                       {d.source_says}
                       {d.source_holiday && <span className="muted"> · {d.source_holiday}</span>}
@@ -418,7 +419,7 @@ function YearPage({ name, year, day }: { name: string; year: number; day: string
         </p>
         {data && (
           <p className="lede">
-            {KIND_LABEL[data.kind] ?? data.kind}, from {data.source}
+            {KIND_LABEL[data.kind] ?? data.kind}, from <SourceLink name={data.source} />
             {data.kind === "projected" ? ": no publisher covers this year yet, so it's the rules run forward, a best guess" : ""}.{" "}
             {data.closes.filter((c) => c.status === "closed").length} closes and{" "}
             {data.closes.filter((c) => c.status === "early_close").length} early closes on weekdays.
@@ -453,7 +454,7 @@ function YearPage({ name, year, day }: { name: string; year: number; day: string
                     </a>
                   </td>
                   <td>{closeText(c)}</td>
-                  <td className="muted">{c.source}</td>
+                  <td className="muted"><SourceLink name={c.source} /></td>
                 </tr>
               ))}
             </tbody>

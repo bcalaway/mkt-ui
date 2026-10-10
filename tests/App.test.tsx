@@ -165,6 +165,25 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Fixings" })).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("links sources, instruments and calendars across screens", async () => {
+    serve();
+    window.history.replaceState(null, "", "/instruments/UST-10Y-CMT");
+    render(<App />);
+    const cal = await screen.findByRole("link", { name: "SIFMA-US" });
+    expect(cal.getAttribute("href")).toBe(`/calendars/SIFMA-US/${new Date().getFullYear()}`);
+    // Only captured sources have a page: these answers list TD-PRICES and FED-K8, not UST-PAR.
+    expect(screen.queryByRole("link", { name: "Treasury par curve" })).toBeNull();
+    expect(screen.getAllByText("Treasury par curve").length).toBeGreaterThan(0);
+  });
+
+  it("links the curve's tenors to their instruments", async () => {
+    serve();
+    window.history.replaceState(null, "", "/");
+    render(<App />);
+    const tenor = await screen.findByRole("link", { name: "10Y" });
+    expect(tenor.getAttribute("href")).toBe("/instruments/UST-10Y-CMT");
+  });
+
   it("pages search results 50 at a time", async () => {
     const matches = Array.from({ length: 120 }, (_, i) => ({
       name: `EUR${String(i).padStart(3, "0")}-ECB`, aliases: [], tenor: "", description: "ECB rate", status: "active", type: "fx_fixing",
@@ -240,8 +259,9 @@ describe("App", () => {
     serve();
     window.history.replaceState(null, "", "/calendars?date=2026-10-12");
     render(<App />);
-    const link = await screen.findByRole("link", { name: "SIFMA-US" });
-    expect(link.getAttribute("href")).toBe("/calendars/SIFMA-US/2026");
+    // Linked twice: the coverage table and the Coming up table.
+    const links = await screen.findAllByRole("link", { name: "SIFMA-US" });
+    expect(links.map((l) => l.getAttribute("href"))).toEqual(["/calendars/SIFMA-US/2026", "/calendars/SIFMA-US/2026"]);
     expect(screen.getByText("30 · 7 · 74")).toBeInTheDocument();
     expect(screen.getByText("2026-10-12 Mon, Columbus Day")).toBeInTheDocument();
     expect((await screen.findAllByText("Closed: Columbus Day")).length).toBeGreaterThan(0);

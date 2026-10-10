@@ -8,6 +8,7 @@
 import { useEffect, useState } from "react";
 import { ApiError, apiGet, type Schemas } from "../../api/client";
 import { linkProps, useQueryUpdater, type Location } from "../../router";
+import { CalendarLink } from "../../links";
 import type { Screen } from "../types";
 
 const PREFIX = "/sources";
@@ -133,7 +134,7 @@ function ListPage() {
                           <a {...linkProps(`${PREFIX}/${s.name}`)}>{s.name}</a>
                           {s.kind !== "published" && <span className="muted"> · {s.kind}</span>}
                         </td>
-                        <td className="muted">{s.calendar}</td>
+                        <td className="muted"><CalendarLink name={s.calendar} /></td>
                         <td title={s.last_error || (s.late ? `No successful fetch in over ${s.late_after_hours} hours` : undefined)}>
                           <StatusBadge s={s} />
                         </td>
@@ -196,7 +197,7 @@ function DetailPage({ name }: { name: string }) {
           <dl className="facts">
             <dt>Captured for</dt>
             <dd>
-              {s.calendar} ({s.group}, {s.kind})
+              <CalendarLink name={s.calendar} /> ({s.group}, {s.kind})
             </dd>
             <dt>Fetched</dt>
             <dd>{s.period_kind ? PERIOD_LABEL[s.period_kind] ?? s.period_kind : "As one page"}</dd>

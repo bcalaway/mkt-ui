@@ -5,6 +5,7 @@ import CurveChart, { type CurveLine } from "../../charts/CurveChart";
 import { bpChange } from "../../decimal";
 import { SOURCE_LABEL, shortTenor } from "../../format";
 import { useQueryUpdater, type Location } from "../../router";
+import { InstrumentLink, SourceLink } from "../../links";
 import type { Screen } from "../types";
 
 const COMPARE_CHOICES = ["1W", "1M", "3M", "1Y"];
@@ -121,7 +122,7 @@ function CurveTable({ curves, tenors }: { curves: Curve[]; tenors: string[] }) {
           const now = at(base, t);
           return (
             <tr key={t}>
-              <th scope="row">{t}</th>
+              <th scope="row"><InstrumentLink name={`UST-${t}-CMT`} label={t} /></th>
               <td className="num">{now ? `${now.display}%` : "–"}</td>
               {others.map((c) => {
                 const then = at(c, t);
@@ -132,7 +133,7 @@ function CurveTable({ curves, tenors }: { curves: Curve[]; tenors: string[] }) {
                   </td>
                 );
               })}
-              <td className="muted">{now ? SOURCE_LABEL[now.source] ?? now.source : ""}</td>
+              <td className="muted">{now ? <SourceLink name={now.source} label={SOURCE_LABEL[now.source] ?? now.source} /> : ""}</td>
             </tr>
           );
         })}
