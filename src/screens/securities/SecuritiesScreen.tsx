@@ -13,6 +13,7 @@ import StyleChips, { isOhlc } from "../../charts/StyleChips";
 import ZoomChart from "../../charts/ZoomChart";
 import { SOURCE_LABEL, instrumentType, tenorLabel } from "../../format";
 import { linkProps, useLocation, useQueryUpdater, type Location } from "../../router";
+import { CalendarLink, SourceLink } from "../../links";
 import type { Screen } from "../types";
 import { TreasuryDetail, TreasuryList } from "./Treasuries";
 
@@ -238,7 +239,7 @@ function DetailPage({ name }: { name: string }) {
             <p className="figure">
               <span className="figure-value">{inst.latest.display}%</span>
               <span className="figure-note">
-                on {inst.latest.date}, from {SOURCE_LABEL[inst.latest.source] ?? inst.latest.source}.{" "}
+                on {inst.latest.date}, from <SourceLink name={inst.latest.source} label={SOURCE_LABEL[inst.latest.source] ?? inst.latest.source} />.{" "}
                 <a {...linkProps(`/series?names=${encodeURIComponent(inst.name)}`)}>See it over time</a>
               </span>
             </p>
@@ -267,7 +268,7 @@ function DetailPage({ name }: { name: string }) {
               </>
             )}
             <dt>Business days</dt>
-            <dd>{inst.calendar}</dd>
+            <dd><CalendarLink name={inst.calendar} /></dd>
             <dt>Status</dt>
             <dd>{inst.status}</dd>
           </dl>
@@ -284,7 +285,7 @@ function DetailPage({ name }: { name: string }) {
             <tbody>
               {inst.identifiers.map((i) => (
                 <tr key={`${i.scheme}:${i.value}`}>
-                  <td>{SCHEME_LABEL[i.scheme] ?? i.scheme}</td>
+                  <td><SourceLink name={i.scheme} label={SCHEME_LABEL[i.scheme] ?? i.scheme} /></td>
                   <td>
                     <code>{i.value}</code>
                   </td>

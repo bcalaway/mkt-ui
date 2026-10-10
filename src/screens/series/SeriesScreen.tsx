@@ -12,6 +12,7 @@ import type { ChartEvent } from "../../charts/types";
 import ZoomChart from "../../charts/ZoomChart";
 import { SOURCE_LABEL, shortTenor } from "../../format";
 import { useQueryUpdater, type Location } from "../../router";
+import { InstrumentLink, SourceLink } from "../../links";
 import type { Screen } from "../types";
 
 const FIRST = "1962-01-01";
@@ -269,10 +270,10 @@ function LatestTable({ rows }: { rows: LatestRow[] }) {
       <tbody>
         {rows.map((r) => (
           <tr key={r.name}>
-            <th scope="row">{shortTenor(r.name)}</th>
+            <th scope="row"><InstrumentLink name={r.name} label={shortTenor(r.name)} /></th>
             <td className="num">{r.display}%</td>
             <td>{r.date}</td>
-            <td className="muted">{SOURCE_LABEL[r.source] ?? r.source}</td>
+            <td className="muted"><SourceLink name={r.source} label={SOURCE_LABEL[r.source] ?? r.source} /></td>
           </tr>
         ))}
       </tbody>

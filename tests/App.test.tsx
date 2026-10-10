@@ -165,6 +165,25 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Fixings" })).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("links sources, instruments and calendars across screens", async () => {
+    serve();
+    window.history.replaceState(null, "", "/instruments/UST-10Y-CMT");
+    render(<App />);
+    const cal = await screen.findByRole("link", { name: "SIFMA-US" });
+    expect(cal.getAttribute("href")).toBe(`/calendars/SIFMA-US/${new Date().getFullYear()}`);
+    // Only captured sources have a page: these answers list TD-PRICES and FED-K8, not UST-PAR.
+    expect(screen.queryByRole("link", { name: "Treasury par curve" })).toBeNull();
+    expect(screen.getAllByText("Treasury par curve").length).toBeGreaterThan(0);
+  });
+
+  it("links the curve's tenors to their instruments", async () => {
+    serve();
+    window.history.replaceState(null, "", "/");
+    render(<App />);
+    const tenor = await screen.findByRole("link", { name: "10Y" });
+    expect(tenor.getAttribute("href")).toBe("/instruments/UST-10Y-CMT");
+  });
+
   it("pages search results 50 at a time", async () => {
     const matches = Array.from({ length: 120 }, (_, i) => ({
       name: `EUR${String(i).padStart(3, "0")}-ECB`, aliases: [], tenor: "", description: "ECB rate", status: "active", type: "fx_fixing",
