@@ -11,7 +11,7 @@ import { FIRST_DAY, seriesLoader } from "../../charts/loaders";
 import { OPEN_ON_DAYS, PRESETS } from "../../charts/presets";
 import StyleChips, { isOhlc } from "../../charts/StyleChips";
 import ZoomChart from "../../charts/ZoomChart";
-import { SOURCE_LABEL, tenorLabel } from "../../format";
+import { SOURCE_LABEL, instrumentType, tenorLabel } from "../../format";
 import { linkProps, useLocation, useQueryUpdater, type Location } from "../../router";
 import type { Screen } from "../types";
 import { TreasuryDetail, TreasuryList } from "./Treasuries";
@@ -20,10 +20,14 @@ const PREFIX = "/instruments";
 // Where the Treasuries screen used to be (2026-10-07, before it joined Instruments): links there still work.
 const OLD_TREASURIES = "/treasuries";
 
+// Fixings (phase 4, step 4): the reference rates, FX rates and dollar indexes, one list (Bill, 2026-10-10).
+const FIXING_TYPES = ["rate_fixing", "fx_fixing", "fx_index"];
+
 // The Treasury kinds the `type` filter takes (besides `cmt`, the default); `ust` is all of them.
 const TREASURY_TYPES = ["ust", "bill", "note", "bond", "tips", "frn"];
 const TYPES: { key: string; label: string }[] = [
   { key: "cmt", label: "CMT yields" },
+  { key: "fixing", label: "Fixings" },
   { key: "ust", label: "All Treasuries" },
   { key: "bill", label: "Bills" },
   { key: "note", label: "Notes" },
@@ -54,10 +58,14 @@ function ListPage({ query, type, all, start }: { query: string; type: string; al
     setError(null);
     const req = query
       ? apiGet("/api/search", { query: { q: query, limit: PAGE + 1, offset: start }, signal: ctl.signal })
-      : apiGet("/api/instruments", { query: { type: "cmt_yield" }, signal: ctl.signal });
+      : type === "fixing"
+        ? Promise.all(FIXING_TYPES.map((t) => apiGet("/api/instruments", { query: { type: t }, signal: ctl.signal }))).then(
+            (lists) => lists.flat(),
+          )
+        : apiGet("/api/instruments", { query: { type: "cmt_yield" }, signal: ctl.signal });
     req.then(setRows).catch((e: Error) => e.name !== "AbortError" && setError(e.message));
     return () => ctl.abort();
-  }, [query, treasuries, start]);
+  }, [query, treasuries, start, type]);
   const more = !!query && !!rows && rows.length > PAGE;
   const shown = query && rows ? rows.slice(0, PAGE) : rows;
   const pager = query && rows && (start > 0 || more) && (
@@ -82,7 +90,9 @@ function ListPage({ query, type, all, start }: { query: string; type: string; al
         <p className="lede">
           {treasuries
             ? `${all ? "Every marketable Treasury security since 1980" : "The marketable Treasury securities outstanding"}, by maturity, with the on-the-run issues marked and FedInvest's latest end-of-day price per 100. Open one for its terms, auctions and price history.`
-            : "The curve's tenors, with the name each source uses for each, or the Treasury securities by type. Search finds any instrument by short name, CUSIP or an on-the-run alias like UST-10Y-OTR."}
+            : !query && type === "fixing"
+              ? "The fixings: SOFR and EFFR from the New York Fed, the Fed's H.10 exchange rates and dollar indexes, and the ECB's euro rates, each quoted the way its source prints it (EURUSD-H10 is dollars per euro)."
+              : "The curve's tenors, with the name each source uses for each, or the Treasury securities by type. Search finds any instrument by short name, CUSIP or an on-the-run alias like UST-10Y-OTR."}
         </p>
       </header>
       <div className="controls" role="group" aria-label="Type">
@@ -133,6 +143,7 @@ function ListPage({ query, type, all, start }: { query: string; type: string; al
           <thead>
             <tr>
               <th scope="col">Name</th>
+              <th scope="col">Type</th>
               <th scope="col">Tenor</th>
               <th scope="col">Description</th>
               <th scope="col">Also known as</th>
@@ -144,6 +155,7 @@ function ListPage({ query, type, all, start }: { query: string; type: string; al
                 <th scope="row">
                   <a {...linkProps(`${PREFIX}/${encodeURIComponent(r.name)}`)}>{r.name}</a>
                 </th>
+                <td>{instrumentType(r.type)}</td>
                 <td>{tenorLabel(r.tenor)}</td>
                 <td>{r.description}</td>
                 <td className="muted">{r.aliases.join(", ")}</td>
@@ -235,10 +247,25 @@ function DetailPage({ name }: { name: string }) {
 
           <h2>About</h2>
           <dl className="facts">
-            <dt>Tenor</dt>
-            <dd>{tenorLabel(inst.tenor)}</dd>
-            <dt>Curve</dt>
-            <dd>{inst.curve} ({inst.currency}, {inst.country})</dd>
+            <dt>Type</dt>
+            <dd>{instrumentType(inst.type)}</dd>
+            {inst.tenor && (
+              <>
+                <dt>Tenor</dt>
+                <dd>{tenorLabel(inst.tenor)}</dd>
+              </>
+            )}
+            {inst.curve ? (
+              <>
+                <dt>Curve</dt>
+                <dd>{inst.curve} ({inst.currency}, {inst.country})</dd>
+              </>
+            ) : (
+              <>
+                <dt>Currency</dt>
+                <dd>{inst.currency} ({inst.country})</dd>
+              </>
+            )}
             <dt>Business days</dt>
             <dd>{inst.calendar}</dd>
             <dt>Status</dt>

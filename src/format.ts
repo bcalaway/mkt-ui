@@ -7,6 +7,29 @@ export function tenorLabel(iso: string): string {
   return m ? `${m[1]}${m[2]}` : iso;
 }
 
+/** The security master's instrument types, as the screens name them (anything else shows as it comes). */
+export const INSTRUMENT_TYPE: Record<string, string> = {
+  cmt_yield: "CMT yield",
+  ust_bill: "Bill",
+  ust_note: "Note",
+  ust_bond: "Bond",
+  ust_tips: "TIPS",
+  ust_frn: "FRN",
+  ust_strip_interest: "STRIPS, interest",
+  ust_strip_principal: "STRIPS, principal",
+  rate_fixing: "Rate fixing",
+  fx_fixing: "FX fixing",
+  fx_index: "FX index",
+  fut_product: "Futures product",
+  fut_treasury: "Treasury future",
+  fut_stir: "Rate future",
+  fut_fx: "FX future",
+};
+
+export function instrumentType(type: string): string {
+  return INSTRUMENT_TYPE[type] ?? type;
+}
+
 /** "UST-10Y-CMT" -> "10Y": the short name's tenor part, for compact labels. */
 export function shortTenor(name: string): string {
   const m = /^UST-(.+)-CMT$/.exec(name);

@@ -142,6 +142,29 @@ describe("App", () => {
     expect(asked).toContain("/api/instruments?type=cmt_yield");
   });
 
+  it("shows each instrument's type, and lists the fixings together", async () => {
+    const byType: Record<string, unknown[]> = {
+      rate_fixing: [{ name: "SOFR", aliases: [], tenor: "", description: "Secured Overnight Financing Rate", status: "active", type: "rate_fixing" }],
+      fx_fixing: [{ name: "EURUSD-H10", aliases: [], tenor: "", description: "H.10: dollars per euro", status: "active", type: "fx_fixing" }],
+      fx_index: [{ name: "USD-BROAD-H10", aliases: [], tenor: "", description: "Broad dollar index", status: "active", type: "fx_index" }],
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        const t = new URLSearchParams(url.split("?")[1] ?? "").get("type") ?? "";
+        return Promise.resolve({ ok: true, status: 200, statusText: "", json: () => Promise.resolve(byType[t] ?? []) });
+      }),
+    );
+    window.history.replaceState(null, "", "/instruments?type=fixing");
+    render(<App />);
+    expect(await screen.findByRole("link", { name: "USD-BROAD-H10" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "SOFR" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Type" })).toBeInTheDocument();
+    expect(screen.getByText("Rate fixing")).toBeInTheDocument();
+    expect(screen.getByText("FX index")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Fixings" })).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("pages search results 50 at a time", async () => {
     const matches = Array.from({ length: 120 }, (_, i) => ({
       name: `EUR${String(i).padStart(3, "0")}-ECB`, aliases: [], tenor: "", description: "ECB rate", status: "active", type: "fx_fixing",
