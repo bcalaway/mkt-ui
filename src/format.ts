@@ -21,9 +21,7 @@ export const INSTRUMENT_TYPE: Record<string, string> = {
   fx_fixing: "FX fixing",
   fx_index: "FX index",
   fut_product: "Futures product",
-  fut_treasury: "Treasury future",
-  fut_stir: "Rate future",
-  fut_fx: "FX future",
+  future: "Future",
 };
 
 export function instrumentType(type: string): string {
