@@ -102,3 +102,15 @@ export function priceLoader(name: string, record: Recorder): Loader {
     points: s.bars.map((b) => point(b, "", interval, "FedInvest end of day")),
   }), PRICES_FIRST_DAY, today());
 }
+
+export const FIXINGS_FIRST_DAY = "1971-01-01"; // the H.10 rates' first; SOFR's is 2018, the ECB's 1999
+
+/** A fixing's golden values (mkt-api charts a fixing in its own unit): a rate in percent, an FX rate or index as printed. */
+export function fixingLoader(name: string, unit: string, record: Recorder): Loader {
+  return blockLoader([name], "", record, (s, _k, interval) => ({
+    key: name,
+    label: name,
+    slot: 0,
+    points: s.bars.map((b) => point(b, unit === "%" ? "%" : "", interval, SOURCE_LABEL[b.source] ?? b.source)),
+  }), FIXINGS_FIRST_DAY, today());
+}

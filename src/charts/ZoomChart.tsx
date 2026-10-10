@@ -65,6 +65,7 @@ const GAP_DAYS: Record<Interval, number> = { day: 10, week: 21, month: 70, quart
 function axisLabel(v: number, unit: string): string {
   if (unit === "bp") return v.toFixed(0);
   if (unit === "price") return v.toFixed(3);
+  if (unit === "value") return String(Number(v.toPrecision(6))); // an FX rate or index: "1.1259", "157.81"
   return `${v.toFixed(2)}%`;
 }
 

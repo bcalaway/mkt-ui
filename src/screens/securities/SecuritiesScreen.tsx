@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ApiError, apiGet, type InstrumentDetail, type InstrumentSummary } from "../../api/client";
 import LoadStats, { useLoadStats } from "../../charts/LoadStats";
-import { FIRST_DAY, seriesLoader } from "../../charts/loaders";
+import { FIRST_DAY, FIXINGS_FIRST_DAY, fixingLoader, seriesLoader } from "../../charts/loaders";
 import { OPEN_ON_DAYS, PRESETS } from "../../charts/presets";
 import { isOhlc } from "../../charts/StyleChips";
 import ZoomChart from "../../charts/ZoomChart";
@@ -192,6 +192,32 @@ function YieldHistory({ name }: { name: string }) {
   );
 }
 
+/** A fixing's history (golden values from its one source), zoomable, in its unit: a rate in percent, an FX rate or index as printed. */
+function FixingHistory({ name, unit, heading }: { name: string; unit: string; heading: string }) {
+  const stats = useLoadStats();
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const ohlc = isOhlc(useLocation());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const loader = useMemo(() => fixingLoader(name, unit, stats.record), [name, unit]);
+  return (
+    <>
+      <h2>{heading}</h2>
+      <ZoomChart
+        loader={loader}
+        first={FIXINGS_FIRST_DAY}
+        today={today}
+        unit={unit}
+        bars={ohlc}
+        styleToggle
+        presets={PRESETS}
+        initialDays={OPEN_ON_DAYS}
+        onInterval={stats.setShown}
+      />
+      <LoadStats totals={stats.totals} interval={stats.interval} />
+    </>
+  );
+}
+
 function DetailPage({ name }: { name: string }) {
   // A Treasury security has its own page (price, terms, auctions); a CMT or anything else, this one.
   // The list links them alike, so it's decided by the instrument's type once it arrives.
@@ -231,14 +257,20 @@ function DetailPage({ name }: { name: string }) {
           </header>
           {inst.latest && (
             <p className="figure">
-              <span className="figure-value">{inst.latest.display}%</span>
+              <span className="figure-value">
+                {inst.latest.display}
+                {inst.unit === "%" ? "%" : ""}
+              </span>
               <span className="figure-note">
                 on {inst.latest.date}, from <SourceLink name={inst.latest.source} label={SOURCE_LABEL[inst.latest.source] ?? inst.latest.source} />.{" "}
-                <a {...linkProps(`/series?names=${encodeURIComponent(inst.name)}`)}>See it over time</a>
+                {inst.type === "cmt_yield" && <a {...linkProps(`/series?names=${encodeURIComponent(inst.name)}`)}>See it over time</a>}
               </span>
             </p>
           )}
           {inst.type === "cmt_yield" && <YieldHistory name={inst.name} />}
+          {FIXING_TYPES.includes(inst.type) && (
+            <FixingHistory name={inst.name} unit={inst.unit ?? "%"} heading={inst.type === "fx_index" ? "Index" : "Rate"} />
+          )}
 
           <h2>About</h2>
           <dl className="facts">
