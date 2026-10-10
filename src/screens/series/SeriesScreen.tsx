@@ -6,7 +6,7 @@ import { apiGet, type ChartEventOut, type InstrumentSummary } from "../../api/cl
 import LoadStats, { useLoadStats } from "../../charts/LoadStats";
 import { seriesLoader, spreadLoader } from "../../charts/loaders";
 import { OPEN_ON_DAYS, PRESETS } from "../../charts/presets";
-import StyleChips, { isOhlc } from "../../charts/StyleChips";
+import { isOhlc } from "../../charts/StyleChips";
 import { MAX_SERIES } from "../../charts/theme";
 import type { ChartEvent } from "../../charts/types";
 import ZoomChart from "../../charts/ZoomChart";
@@ -146,7 +146,6 @@ function SeriesPage({ location }: { location: Location }) {
           ))}
       </div>
       <div className="controls" role="group" aria-label="Display">
-        <StyleChips ohlc={ohlc} />
         <label>
           Source
           <select value={source} onChange={(e) => setQuery({ source: e.target.value || null })}>
@@ -165,6 +164,7 @@ function SeriesPage({ location }: { location: Location }) {
         today={today}
         unit="%"
         bars={ohlc}
+        styleToggle
         presets={PRESETS}
         initialDays={OPEN_ON_DAYS}
         onInterval={yields.setShown}
@@ -194,6 +194,7 @@ function SeriesPage({ location }: { location: Location }) {
             today={today}
             unit="bp"
             bars={ohlc}
+            styleToggle
             height={260}
             presets={PRESETS}
             initialDays={OPEN_ON_DAYS}

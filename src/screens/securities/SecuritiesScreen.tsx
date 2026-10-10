@@ -9,7 +9,7 @@ import { ApiError, apiGet, type InstrumentDetail, type InstrumentSummary } from 
 import LoadStats, { useLoadStats } from "../../charts/LoadStats";
 import { FIRST_DAY, seriesLoader } from "../../charts/loaders";
 import { OPEN_ON_DAYS, PRESETS } from "../../charts/presets";
-import StyleChips, { isOhlc } from "../../charts/StyleChips";
+import { isOhlc } from "../../charts/StyleChips";
 import ZoomChart from "../../charts/ZoomChart";
 import { SOURCE_LABEL, instrumentType, tenorLabel } from "../../format";
 import { linkProps, useLocation, useQueryUpdater, type Location } from "../../router";
@@ -180,15 +180,13 @@ function YieldHistory({ name }: { name: string }) {
   return (
     <>
       <h2>Yield</h2>
-      <div className="controls" role="group" aria-label="Display">
-        <StyleChips ohlc={ohlc} />
-      </div>
       <ZoomChart
         loader={loader}
         first={FIRST_DAY}
         today={today}
         unit="%"
         bars={ohlc}
+        styleToggle
         presets={PRESETS}
         initialDays={OPEN_ON_DAYS}
         onInterval={stats.setShown}

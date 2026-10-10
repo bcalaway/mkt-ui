@@ -189,12 +189,17 @@ table.capture-text td:first-child { width: 4rem; }
    the value axis's labels. */
 .chart-toolbar {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 8px;
   padding: 6px 8px;
   border-bottom: 1px solid var(--rule);
 }
+.tool-group { display: flex; gap: 4px; }
+.tool-group.span { margin-left: auto; } /* the span buttons stay right, with or without a toggle on the left */
+button.tool { display: inline-flex; align-items: center; gap: 4px; }
+button.tool.icon { min-width: 2rem; justify-content: center; padding: 0.15rem 0.4rem; }
+button.tool[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--surface); }
 button.tool {
   background: var(--surface);
   color: var(--ink-2);

@@ -8,7 +8,7 @@ import { ApiError, apiGet, type Schemas } from "../../api/client";
 import LoadStats, { useLoadStats } from "../../charts/LoadStats";
 import { PRICES_FIRST_DAY, priceLoader } from "../../charts/loaders";
 import { OPEN_ON_DAYS, PRESETS } from "../../charts/presets";
-import StyleChips, { isOhlc } from "../../charts/StyleChips";
+import { isOhlc } from "../../charts/StyleChips";
 import ZoomChart from "../../charts/ZoomChart";
 import { linkProps, useLocation } from "../../router";
 import { CalendarLink, SourceLink } from "../../links";
@@ -217,15 +217,13 @@ export function TreasuryDetail({ name }: { name: string }) {
           {loader && (
             <>
               <h2>Price</h2>
-              <div className="controls" role="group" aria-label="Display">
-                <StyleChips ohlc={ohlc} />
-              </div>
               <ZoomChart
                 loader={loader}
                 first={PRICES_FIRST_DAY}
                 today={today}
                 unit="price"
                 bars={ohlc}
+                styleToggle
                 presets={PRESETS}
                 initialDays={OPEN_ON_DAYS}
                 onInterval={stats.setShown}
